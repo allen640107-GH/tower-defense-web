@@ -53,6 +53,9 @@
 <!-- 技能與道具列 -->
 <div id="skills" class="hidden"></div>
 
+<!-- 天氣／夜晚 -->
+<div id="wx" class="hidden"><img id="wxI" src="img/w_sun.webp" alt=""><img id="wxN" src="img/w_night.webp" alt="" class="hidden"><span id="wxT">晴朗</span></div>
+
 <!-- 建塔／塔資訊面板 -->
 <div id="panel" class="hidden">
   <div id="towerBtns"></div>
@@ -82,14 +85,14 @@
     <button id="mCredits" class="big alt">製作名單</button>
     <button id="mReset" class="big alt">重置存檔</button>
   </div>
-  <div class="ver">v2.0 恐龍防線</div>
+  <div class="ver">v2.1 恐龍防線</div>
 </div>
 
 <!-- 關卡選擇 -->
 <div id="select" class="screen hidden">
-  <div class="stitle">選擇關卡</div>
-  <div id="levels" class="scroll"></div>
-  <button id="sBack" class="big alt">返回</button>
+  <div id="selTop"><button id="sBack" class="big alt">返回</button><div class="stitle">世界地圖</div><div id="heroPick"></div></div>
+  <div id="world"><div id="wmap"><img id="wmapImg" src="img/worldmap.webp" alt=""><svg id="wroute"></svg><div id="wnodes"></div></div></div>
+  <div id="lvInfo"><div class="li1"><b id="liName"></b><span id="liStars"></span></div><div id="liTags"></div><button id="lvGo" class="big">出發！</button></div>
 </div>
 
 <!-- 圖鑑 -->
@@ -128,7 +131,12 @@
   <div class="helpbox scroll">
     <p>恐龍沿著道路衝向營地，抵達營門會扣<b>生命</b>。生命歸零即失敗，撐過所有<b>波次</b>即勝利。</p>
     <p><b>建塔：</b>點面板上的塔，再點空地。<b>點已建的塔</b>可升級（最高 3 級）或賣出（退回 70%）。</p>
-    <p><b class="c1">石矛塔</b> 射速快、可打飛行。<b class="c2">火山投石</b> 範圍爆炸、打不到飛行。<b class="c3">冰晶塔</b> 緩速。<b class="c5">毒液花</b> 持續毒傷、無視護甲。<b class="c4">特斯拉電塔</b> 連鎖閃電。<b class="c6">琥珀晶塔</b> 超遠距離、專打血最多的恐龍。</p>
+    <p><b class="c1">石矛塔</b> 射速快、可打飛行。<b class="c2">火山投石</b> 範圍爆炸、打不到飛行。<b class="c3">冰晶塔</b> 緩速。<b class="c5">毒液花</b> 持續毒傷、無視護甲。<b class="c4">特斯拉電塔</b> 連鎖閃電。<b class="c6">琥珀晶塔</b> 超遠距離、專打血最多的恐龍。<b>火把塔</b> 便宜、照亮夜晚、會丟火把。</p>
+    <p><b>世界地圖：</b>共 7 章 16 關。點地圖上的關卡節點看介紹，再按「出發！」（或再點一次節點）。紅色節點是章節魔王關。有些關卡有<b>分岔路</b>或<b>兩個入口</b>，恐龍會分頭進攻。</p>
+    <p><b>英雄：</b>在關卡選擇畫面挑選<b>原始人獵人・岩牙</b>或<b>馴龍師・翠拉</b>。英雄會自動攻擊、擋住地面恐龍並累積經驗升級（最高 5 級）。<b>拖曳英雄</b>，或<b>點英雄再點地點</b>即可移動。技能列第一格是<b>大招</b>（有冷卻）。英雄倒下後會倒數復活。</p>
+    <p><b>馴服：</b>擊倒地面恐龍有機率收服成<b>友軍</b>，會在原地擋路並攻擊（上限 3 隻，馴龍師 4 隻且機率更高）。魔王與飛行恐龍無法收服。</p>
+    <p><b>進化：</b>塔升到 3 級後可選兩種進化之一（每種塔 2 條路線，共 12 種），外觀、子彈與效果都不同。賣出一樣退回 70%。</p>
+    <p><b>天氣與夜晚：</b>下雨削弱火、強化電；起霧射程變短；暴風雪讓恐龍變慢、冰更強；火山灰強化火。夜晚只有塔、英雄與<b>火把塔</b>的光照範圍內能被攻擊，記得蓋火把塔！每關都有專屬魔王與技能。</p>
     <p><b>技能（有冷卻）：</b>隕石（點地圖砸下）、尖刺陷阱（放在道路上）、空投補給（立即獲得金幣與道具）。</p>
     <p><b>道具：</b>草藥（+5 生命）、冰凍炸彈（凍住全場 3 秒）、金幣袋（+150 金）、炸藥（點地圖爆破）。道具會保留到下一關。</p>
     <p><b>環境：</b>點<b>岩石</b>花金幣敲碎可得獎勵與化石；沼澤泥坑會減速；火山噴氣口會燒傷恐龍；<b>恐龍蛋</b>會孵化，先點破它！</p>
@@ -159,6 +167,7 @@
 <script src="js/audio.js"></script>
 <script src="js/levels.js"></script>
 <script src="js/credits.js"></script>
+<script src="js/v21.js"></script>
 <script src="js/game.js"></script>
 </body>
 </html>

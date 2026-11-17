@@ -4,8 +4,11 @@
 const AUDIO = (() => {
   const SFX_NAMES = ["click", "back", "deny", "build", "upgrade", "sell", "coin", "spear", "spearhit", "lava", "boom", "frost", "shatter",
     "zap", "venom", "amber", "hit", "roar1", "roar2", "roar3", "die1", "die2", "die3", "boss", "bossdie", "meteor", "trap", "airdrop",
-    "item", "wave", "leak", "rock", "erupt", "achieve", "heal"];
-  const LIMIT = { spear: 3, spearhit: 3, hit: 3, zap: 2, frost: 2, venom: 2, coin: 3, die1: 2, die2: 2, die3: 2, boom: 3, lava: 2, amber: 2 };
+    "item", "wave", "leak", "rock", "erupt", "achieve", "heal",
+    "hero_atk", "hero_whip", "ult_hunter", "ult_tamer", "hero_die", "revive", "tame", "evolve", "torch",
+    "b_carno", "b_croc", "b_quetzal", "b_mammoth", "b_lavadrake", "b_queen", "sk_charge", "sk_submerge", "sk_gust", "sk_stomp", "sk_fire", "sk_summon",
+    "amb_rain", "amb_wind"];
+  const LIMIT = { spear: 3, spearhit: 3, hit: 3, hero_atk: 2, hero_whip: 2, zap: 2, frost: 2, venom: 2, coin: 3, die1: 2, die2: 2, die3: 2, boom: 3, lava: 2, amber: 2 };
   let ctx = null, master = null, sfxGain = null, musicGain = null, unlocked = false;
   const buffers = {}, raw = {}, playing = {}, lastAt = {};
   let muted = false, vMusic = 0.7, vSfx = 0.9;
@@ -61,6 +64,17 @@ const AUDIO = (() => {
     s.connect(g); g.connect(sfxGain); s.start(0);
     playing[n].push(now + b.duration / s.playbackRate.value);
   }
+  // 天氣環境音（循環）：雨、風雪
+  let ambSrc = null, ambGain = null, ambName = null;
+  function ambient(n) {
+    if (n === ambName && ambSrc) return; ambName = n;
+    if (ambSrc) { try { const g = ambGain, t = ctx.currentTime; g.gain.setTargetAtTime(0, t, 0.4); const s0 = ambSrc; setTimeout(() => { try { s0.stop(); } catch (e) { /* */ } }, 1500); } catch (e) { /* */ } ambSrc = null; }
+    if (!n || !ctx || !unlocked) return;
+    const b = buffers[n]; if (!b) { setTimeout(() => { if (ambName === n && !ambSrc) { ambName = null; ambient(n); } }, 800); return; }
+    ambSrc = ctx.createBufferSource(); ambSrc.buffer = b; ambSrc.loop = true;
+    ambGain = ctx.createGain(); ambGain.gain.value = 0; ambGain.gain.setTargetAtTime(0.55, ctx.currentTime, 0.6);
+    ambSrc.connect(ambGain); ambGain.connect(sfxGain); ambSrc.start(0);
+  }
   const TRACKS = { menu: "menu", level1: "level1", level2: "level2", boss: "boss", win: "win", lose: "lose" };
   function music(name, force) {
     wantTrack = name;
@@ -86,6 +100,6 @@ const AUDIO = (() => {
     if ("muted" in o) muted = !!o.muted; if ("music" in o) vMusic = o.music; if ("sfx" in o) vSfx = o.sfx;
     applyVol(); if (musicEl && !musicSrc) musicEl.volume = muted ? 0 : vMusic;
   }
-  return { preload, unlock, play, music, stopMusic, pauseMusic, set, get unlocked() { return unlocked; }, count: SFX_NAMES.length,
+  return { preload, unlock, play, ambient, music, stopMusic, pauseMusic, set, get unlocked() { return unlocked; }, count: SFX_NAMES.length,
     get ready() { return Object.keys(buffers).length; } };
 })();

@@ -45,6 +45,32 @@ SFX = {
  'erupt':    ([(S+'lowFrequency_explosion_000.ogg',0,None,0,0),(S+'thrusterFire_004.ogg',0,None,100,-4)], -2),
  'achieve':  ([(I+'confirmation_002.ogg',0,None,0,0),(O+'magical_4.ogg',0,None,100,-4)], -5),
  'heal':     ([(O+'magical_6_0.ogg',0,None,0,0)], -12),
+ # ---- v2.1 ----
+ 'hero_atk': ([(O+'sw/swishes/swish-3.wav',0,None,0,0),(K+'impactPunch_heavy_001.ogg',0,None,120,-4)], -8),
+ 'hero_whip':([(O+'sw/swishes/swish-12.wav',0,None,0,0),(R+'knifeSlice2.ogg',0,None,90,-2)], -8),
+ 'ult_hunter':([(O+'sw/swishes/swish-1.wav',0,None,0,0),(O+'sw/swishes/swish-5.wav',0,None,120,0),(O+'sw/swishes/swish-8.wav',0,None,240,0),(K+'impactPunch_heavy_002.ogg',0,None,520,0),(K+'impactWood_heavy_004.ogg',0,None,640,0),(O+'c2/human_03.ogg',0,None,0,-4)], -2),
+ 'ult_tamer':([(O+'c2/roar_05.ogg',0,None,0,0),(K+'impactSoft_heavy_001.ogg',0,None,200,0),(K+'impactSoft_heavy_003.ogg',0,None,420,0),(K+'impactSoft_heavy_000.ogg',0,None,640,0),(O+'small_dino_raspy_calls.mp3',0,0.88,300,-3)], -2),
+ 'hero_die': ([(O+'c2/human_06.ogg',0,None,0,0)], -6),
+ 'revive':   ([(O+'magical_7_0.ogg',0,None,0,0)], -6),
+ 'tame':     ([(O+'c1/cute_03.ogg',0,None,0,0),(O+'magical_3.ogg',0,None,80,-4)], -5),
+ 'evolve':   ([(O+'magical_5.ogg',0,None,0,0),(I+'maximize_006.ogg',0,None,0,-2),(K+'impactMining_003.ogg',0,None,250,-4)], -3),
+ 'torch':    ([(S+'thrusterFire_000.ogg',0,0.6,0,0)], -10),
+ 'b_carno':  ([(O+'c1/monster_03.ogg',0,None,0,0),(S+'lowFrequency_explosion_000.ogg',0,None,0,-8)], -1),
+ 'b_croc':   ([(O+'c2/monster_12.ogg',0,None,0,0),(O+'c2/slime_03.ogg',0,None,200,-3)], -1),
+ 'b_quetzal':([(O+'c1/scream_01.ogg',0,None,0,0),(O+'sw/swishes/swish-10.wav',0,None,100,-2)], -1),
+ 'b_mammoth':([(O+'monster_roar.wav',0,2.5,0,0),(O+'c1/howl.ogg',0,None,0,-4)], -1),
+ 'b_lavadrake':([(O+'c2/monster_16.ogg',0,None,0,0),(S+'thrusterFire_004.ogg',0,None,150,-4)], -1),
+ 'b_queen':  ([(O+'c1/scream_02.ogg',0,None,0,0),(O+'small_dino_raspy_calls.mp3',2.0,1.0,250,-2)], -1),
+ 'sk_charge':([(O+'c2/stomp_01.ogg',0,None,0,0),(K+'impactSoft_heavy_002.ogg',0,None,180,0),(K+'impactSoft_heavy_004.ogg',0,None,360,0)], -3),
+ 'sk_submerge':([(O+'c2/slime_06.ogg',0,None,0,0),(S+'slime_001.ogg',0,None,100,-2)], -5),
+ 'sk_gust':  ([(O+'sw/swishes/swish-13.wav',0,None,0,0),(O+'sw/swishes/swish-11.wav',0,None,150,0)], -4),
+ 'sk_stomp': ([(S+'lowFrequency_explosion_001.ogg',0,None,0,0),(O+'ice/IceShatters/LedasLuzta.ogg',0,None,120,-3)], -2),
+ 'sk_fire':  ([(S+'thrusterFire_003.ogg',0,None,0,0),(S+'explosionCrunch_001.ogg',0,None,300,-5)], -3),
+ 'sk_summon':([(O+'c2/attack_02.ogg',0,None,0,0),(O+'small_dino_raspy_calls.mp3',0,0.88,250,-3)], -3),
+}
+LOOPS = {  # name: (file, start, dur)
+ 'amb_rain': (O+'rain/1.mp3', 0, 24),
+ 'amb_wind': (O+'winter-wind.mp3', 10, 24),
 }
 MUSIC = {
  'intro': ('Strength of the Titans.mp3', 0, 24),
@@ -85,3 +111,8 @@ for name,(f,ss,d) in MUSIC.items():
     if d: af+=f',afade=t=out:st={d-3}:d=3'
     run(args+['-i',SRC+'/music/'+f,'-af',af,'-ar','44100','-ac','2','-b:a','96k',OUT+f'/music/{name}.mp3'])
     print('music',name)
+for name,(f,ss,d) in LOOPS.items():  # 環境音：-26 LUFS，頭尾交叉淡入淡出以便循環
+    run(['ffmpeg','-y','-hide_banner','-v','error','-ss',str(ss),'-t',str(d+1.5),'-i',f,'-filter_complex',
+         f'[0:a]loudnorm=I=-26:TP=-6,aformat=sample_rates=44100:channel_layouts=mono,asplit[a][b];[a]atrim=0:{d},asetpts=PTS-STARTPTS[x];[b]atrim={d}:{d+1.5},asetpts=PTS-STARTPTS[y];[y][x]acrossfade=d=1.5[m]',
+         '-map','[m]','-b:a','64k',OUT+f'/sfx/{name}.mp3'])
+    print('loop',name)

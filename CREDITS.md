@@ -2,6 +2,7 @@
 
 ## 美術與影片
 - 所有場景地圖、恐龍、防禦塔（6 種 × 3 級）、道具與技能圖示、子彈與特效、介面圖示、石板材質、主選單背景、**片頭影片**（4 個鏡頭剪接）與**標題循環影片**，皆以 **Grok Imagine（xAI）** 生成（GenerateImage / GenerateVideo）。
+- **v2.1 新增**（同樣以 Grok Imagine 生成，原始檔在 `art/src/`）：英雄「原始人獵人・岩牙」「馴龍師・翠拉」（hero_hunter.jpg、hero_tamer.jpg）、12 種進化塔（evo_*.jpg，每張左 a 右 b）、火把塔 3 級（tower_torch.jpg）、6 隻新魔王（boss_carno / croc / quetzal / mammoth / lavadrake / queen.jpg）、天氣與 HUD 圖示（sheet_weather.jpg）、英雄與進化子彈／特效（sheet_fx2.jpg）、霧氣材質（fog_tex.jpg），以及新場景地圖 海岸／天空浮島／地底洞穴（terrain_coast / sky / cave.jpg）與章節世界地圖（worldmap.jpg）。友軍沿用原恐龍圖並加綠色光環與收服圖示。
 - 原始生成檔保存在 `art/src/`（圖片）與 `art/src/video/`（影片原始鏡頭）；`art/tools/process_art.py` 負責去背（色鍵）、裁切、壓縮成 `img/*.webp`。
 - 標題文字為真實字型疊加，不是 AI 生成文字：**Noto Serif CJK TC Bold**（Google / Adobe，SIL Open Font License 1.1，https://github.com/notofonts/noto-cjk），以 fonttools 子集化為 `fonts/title.woff2`。
 
@@ -50,5 +51,20 @@ https://creativecommons.org/licenses/by/4.0/
 | trap, airdrop | rpg-audio chop + impactWood_medium_002；interface maximize_008 + impactWood_heavy_003 | Kenney | CC0 |
 | item, heal, achieve | magical_1, magical_6, magical_4 + interface confirmation_002 | JaggedStone；Kenney | CC0 |
 | wave | impactSoft_heavy_000/002/004（部落鼓三連擊）+ roar_02 | Kenney；rubberduck | CC0 |
+
+### v2.1 新增音效（全部 CC0 1.0）
+| 遊戲檔（audio/sfx/） | 原始素材 | 作者 / 來源 | 授權 |
+|---|---|---|---|
+| hero_atk, hero_whip | swish-3 + impactPunch_heavy_001；swish-12 + rpg-audio knifeSlice2 | artisticdude；Kenney | CC0 |
+| ult_hunter | swish-1/5/8 + impactPunch_heavy_002 + impactWood_heavy_004 + human_03 | artisticdude；Kenney；rubberduck | CC0 |
+| ult_tamer | roar_05 + impactSoft_heavy_000/001/003 + small_dino_raspy_calls | rubberduck；Kenney；CaveboyTup | CC0 |
+| hero_die, revive | human_06；magical_7 | rubberduck；JaggedStone | CC0 |
+| tame, evolve | cute_03 + magical_3；magical_5 + maximize_006 + impactMining_003 | rubberduck；JaggedStone；Kenney | CC0 |
+| torch | sci-fi thrusterFire_000 | Kenney | CC0 |
+| b_carno, b_croc, b_quetzal, b_lavadrake, b_queen（魔王登場） | monster_03 / monster_12 + slime_03 / scream_01 + swish-10 / monster_16 + thrusterFire_004 / scream_02 + small_dino_raspy_calls（另混 lowFrequency_explosion_000） | rubberduck；artisticdude；Kenney；CaveboyTup | CC0 |
+| b_mammoth（魔王登場） | monster_roar.wav + howl | trazzz123 — https://opengameart.org/content/cc0-deep-monster-roar ；rubberduck | CC0 |
+| sk_charge, sk_submerge, sk_gust, sk_stomp, sk_fire, sk_summon（魔王技能） | stomp_01 + impactSoft_heavy；slime_06 + slime_001；swish-13/11；lowFrequency_explosion_001 + LedasLuzta；thrusterFire_003 + explosionCrunch_001；attack_02 + small_dino_raspy_calls | rubberduck；Kenney；artisticdude；IgnasD；CaveboyTup | CC0 |
+| amb_rain（雨聲循環） | Rain (loopable) — rain/1.mp3 | Ylmir — https://opengameart.org/content/rain-loopable | CC0 |
+| amb_wind（暴風雪風聲循環） | Winter Wind — winter-wind.mp3 | wipics — https://opengameart.org/content/winter-wind | CC0 |
 
 片頭影片的音軌 = Strength of the Titans（CC BY 4.0）＋ 上表的 boss 吼叫音效（CC0）。

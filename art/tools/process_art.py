@@ -113,7 +113,7 @@ for sheet, nm in names.items():
     for im, n in zip(grid(k, 3, 3), nm):
         save(fit(im, sz[sheet]), ('i_' if sheet in ('ui', 'items') else '') + n)
 # terrains -> 16:10 crop, 1280x800
-for n in ['jungle', 'swamp', 'canyon', 'ice', 'volcano', 'nest', 'lair']:
+for n in ['jungle', 'swamp', 'canyon', 'ice', 'volcano', 'nest', 'lair', 'coast', 'sky', 'cave']:
     im = Image.open(SRC + f'terrain_{n}.jpg').convert('RGB')
     w, h = im.size; nw = int(h * 1.6); x = (w - nw) // 2
     im = im.crop((x, 0, x + nw, h)).resize((1280, 800), Image.LANCZOS)
@@ -122,4 +122,38 @@ for n in ['road_dirt', 'road_stone', 'panel_stone']:
     Image.open(SRC + n + '.jpg').convert('RGB').resize((512, 512), Image.LANCZOS).save(OUT + n + '.webp', 'WEBP', quality=80, method=6)
 Image.open(SRC + 'menu_bg.jpg').convert('RGB').save(OUT + 'menu_bg.webp', 'WEBP', quality=80, method=6)
 Image.open(SRC + 'menu_bg_portrait.jpg').convert('RGB').save(OUT + 'menu_bg_portrait.webp', 'WEBP', quality=80, method=6)
+Image.open(SRC + 'worldmap.jpg').convert('RGB').save(OUT + 'worldmap.webp', 'WEBP', quality=80, method=6)  # v2.1 世界地圖
 print('done')
+
+# ---------------- v2.1 ----------------
+def split_cols(k, n):
+    A = np.asarray(k.getchannel('A')) > 40
+    col = A.sum(0); W = k.width; cuts = []
+    for i in range(1, n):
+        c = W * i / n; lo, hi = int(c - W * 0.12), int(c + W * 0.12)
+        cuts.append(lo + int(np.argmin(col[lo:hi])))
+    xs = [0] + cuts + [W]
+    return [trim(k.crop((xs[i], 0, xs[i + 1], k.height))) for i in range(n)]
+# heroes
+for n in ['hunter', 'tamer']:
+    save(fit(trim(key(Image.open(SRC + f'hero_{n}.jpg'), strong=True)), 420), 'h_' + n)
+# bosses
+for n, mx in [('carno', 560), ('croc', 560), ('quetzal', 560), ('mammoth', 560), ('lavadrake', 560), ('queen', 520)]:
+    save(fit(trim(key(Image.open(SRC + f'boss_{n}.jpg'), strong=True)), mx), 'b_' + n)
+# torch tower 3 levels
+for i, part in enumerate(split_cols(key(Image.open(SRC + 'tower_torch.jpg')), 3)):
+    save(fit(part, 300), f't_torch{i + 1}')
+# evolutions: 2 per sheet -> e_<type>a / e_<type>b
+for t in ['spear', 'lava', 'frost', 'tesla', 'venom', 'amber']:
+    for i, part in enumerate(split_cols(key(Image.open(SRC + f'evo_{t}.jpg')), 2)):
+        save(fit(part, 340), f'e_{t}' + 'ab'[i])
+for sheet, nm in {'weather': ['w_rain', 'w_fog', 'w_snow', 'w_ash', 'w_night', 'w_torch', 'w_sun', 'i_tame', 'i_evolve'],
+                  'fx2': ['p_hspear', 'p_whip', 'p_lance', 'p_xbow', 'p_rail', 'x_wind', 'x_swamp', 'x_ice', 'x_lava']}.items():
+    k = key(Image.open(SRC + f'sheet_{sheet}.jpg'))
+    for im, n in zip(grid(k, 3, 3), nm):
+        save(fit(im, 192), n)
+# fog overlay: luminance -> alpha (white fog)
+f = Image.open(SRC + 'fog_tex.jpg').convert('L').resize((768, 432), Image.LANCZOS)
+fog = Image.new('RGBA', f.size, (235, 240, 245, 0)); fog.putalpha(f)
+save(fog, 'fog', 70)
+print('v2.1 done')
