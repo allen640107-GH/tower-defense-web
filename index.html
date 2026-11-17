@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#14110f">
+<title>守護之塔 Tower Defense</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="favicon.svg">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="stat"><svg viewBox="0 0 24 24"><path fill="#ff4d5e" d="M12 21s-8-5.2-8-11a4.6 4.6 0 0 1 8-3 4.6 4.6 0 0 1 8 3c0 5.8-8 11-8 11z"/></svg><span id="sLives">20</span></div>
+  <div class="stat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#ffc531" stroke="#a86a00" stroke-width="2"/><text x="12" y="16.5" font-size="11" font-weight="900" text-anchor="middle" fill="#7a4a00">G</text></svg><span id="sGold">0</span></div>
+  <div class="stat"><svg viewBox="0 0 24 24"><path fill="#9fd3ff" d="M3 17l5-10 4 6 3-4 6 8z"/></svg><span id="sWave">1/6</span></div>
+  <div class="hbtns">
+    <button id="bPause" class="ib" aria-label="暫停"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="#fff"/><rect x="14" y="5" width="4" height="14" rx="1" fill="#fff"/></svg></button>
+    <button id="bSpeed" class="ib txt" aria-label="加速">×1</button>
+    <button id="bMute" class="ib" aria-label="音效"><svg viewBox="0 0 24 24"><path id="muteIco" fill="#fff" d="M4 9h4l5-4v14l-5-4H4z"/><path id="muteWave" d="M16 8c1.5 1.2 1.5 6.8 0 8M18.5 6c3 2.5 3 9.5 0 12" stroke="#fff" stroke-width="2" fill="none"/><path id="muteX" d="M16 9l6 6M22 9l-6 6" stroke="#ff6b6b" stroke-width="2.4" style="display:none"/></svg></button>
+  </div>
+</div>
+
+<!-- 建塔／塔資訊面板 -->
+<div id="panel" class="hidden">
+  <div id="towerBtns"></div>
+  <div id="info" class="hidden">
+    <div id="infoTitle"></div>
+    <div id="infoStats"></div>
+    <div class="row">
+      <button id="bUp" class="act up">升級</button>
+      <button id="bSell" class="act sell">賣出</button>
+    </div>
+  </div>
+  <button id="bWave" class="act wave">開始第 1 波</button>
+</div>
+
+<!-- 主選單 -->
+<div id="menu" class="screen">
+  <div class="logo"><div class="l1">守護之塔</div><div class="l2">TOWER DEFENSE</div></div>
+  <div class="mbtns">
+    <button id="mStart" class="big">開始遊戲</button>
+    <button id="mHelp" class="big alt">玩法說明</button>
+    <button id="mSound" class="big alt">音效：開</button>
+    <button id="mReset" class="big alt small">重置存檔</button>
+  </div>
+  <div class="ver">v1.0 ・ 全部畫面與音效皆為程式即時生成</div>
+</div>
+
+<!-- 關卡選擇 -->
+<div id="select" class="screen hidden">
+  <div class="stitle">選擇關卡</div>
+  <div id="levels"></div>
+  <button id="sBack" class="big alt">返回</button>
+</div>
+
+<!-- 說明 -->
+<div id="help" class="screen hidden">
+  <div class="stitle">玩法說明</div>
+  <div class="helpbox">
+    <p>敵人沿道路前進，抵達城門會扣<b>生命</b>。生命歸零即失敗，撐過所有<b>波次</b>即勝利。</p>
+    <p><b>建塔：</b>點下方（或右側）的塔，再點草地空格。<b>點已建的塔</b>可升級或賣出（退回 70%）。</p>
+    <p><b class="c1">箭塔</b> 射速快，可打空中。<b class="c2">砲塔</b> 範圍爆炸，打不到飛行敵人。<b class="c3">冰塔</b> 緩速並造成小範圍傷害。<b class="c4">雷塔</b> 連鎖閃電，可打空中。</p>
+    <p>敵人：步兵、疾風狼（快）、重甲兵（減傷）、夜蝠（飛行）、祭司（治療同伴），以及每關最後的<b>魔王</b>。</p>
+    <p>剩餘生命越多星數越高（最多 3 顆）。進度自動存在本機瀏覽器。</p>
+  </div>
+  <button id="hBack" class="big alt">返回</button>
+</div>
+
+<!-- 暫停／結算 -->
+<div id="overlay" class="screen dim hidden">
+  <div class="card">
+    <div id="oTitle" class="otitle"></div>
+    <div id="oStars" class="stars"></div>
+    <div id="oText" class="otext"></div>
+    <div id="oBtns" class="obtns"></div>
+  </div>
+</div>
+
+<div id="toast" class="hidden"></div>
+<script src="js/audio.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
