@@ -1,52 +1,91 @@
-// 程式合成音效（WebAudio），無任何外部音檔
-const SFX = (() => {
-  let ac = null, master = null, muted = false, noiseBuf = null;
-  const last = {};
-  function init() {
-    if (ac) { if (ac.state === "suspended") ac.resume(); return; }
-    const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
-    ac = new C(); master = ac.createGain(); master.gain.value = muted ? 0 : 0.55; master.connect(ac.destination);
-    noiseBuf = ac.createBuffer(1, ac.sampleRate * 1.0, ac.sampleRate);
-    const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+"use strict";
+// 恐龍防線：音訊系統。音效＝預先解碼的 WebAudio 緩衝；音樂＝串流 <audio> 經 GainNode 控制音量。
+// 所有音檔來源與授權見 CREDITS.md。iPhone Safari 需在第一次觸控後呼叫 AUDIO.unlock()。
+const AUDIO = (() => {
+  const SFX_NAMES = ["click", "back", "deny", "build", "upgrade", "sell", "coin", "spear", "spearhit", "lava", "boom", "frost", "shatter",
+    "zap", "venom", "amber", "hit", "roar1", "roar2", "roar3", "die1", "die2", "die3", "boss", "bossdie", "meteor", "trap", "airdrop",
+    "item", "wave", "leak", "rock", "erupt", "achieve", "heal"];
+  const LIMIT = { spear: 3, spearhit: 3, hit: 3, zap: 2, frost: 2, venom: 2, coin: 3, die1: 2, die2: 2, die3: 2, boom: 3, lava: 2, amber: 2 };
+  let ctx = null, master = null, sfxGain = null, musicGain = null, unlocked = false;
+  const buffers = {}, raw = {}, playing = {}, lastAt = {};
+  let muted = false, vMusic = 0.7, vSfx = 0.9;
+  let musicEl = null, musicSrc = null, curTrack = null, wantTrack = null;
+  function ensureCtx() {
+    if (ctx) return ctx;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null;
+    ctx = new AC(); master = ctx.createGain(); master.connect(ctx.destination);
+    sfxGain = ctx.createGain(); sfxGain.connect(master); musicGain = ctx.createGain(); musicGain.connect(master);
+    applyVol(); return ctx;
   }
-  function ok(key, gap) {
-    if (!ac || muted) return false;
-    const t = ac.currentTime; if (last[key] && t - last[key] < gap) return false; last[key] = t; return true;
+  function applyVol() {
+    if (!ctx) return;
+    master.gain.value = muted ? 0 : 1; sfxGain.gain.value = vSfx; musicGain.gain.value = vMusic * 0.8;
   }
-  function tone(f0, f1, dur, type = "square", vol = 0.2, delay = 0) {
-    const t = ac.currentTime + delay, o = ac.createOscillator(), g = ac.createGain();
-    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.02);
+  // 先把音效檔下載成 ArrayBuffer（不需要使用者手勢）；解碼可在解鎖後進行
+  function preload(onEach) {
+    return Promise.all(SFX_NAMES.map((n) => fetch("audio/sfx/" + n + ".mp3").then((r) => r.ok ? r.arrayBuffer() : null)
+      .then((b) => { raw[n] = b; if (onEach) onEach(); }).catch(() => { if (onEach) onEach(); })));
   }
-  function noise(dur, vol, freq, q = 0.8, type = "lowpass", delay = 0) {
-    const t = ac.currentTime + delay, s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    s.buffer = noiseBuf; f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
-    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + dur + 0.02);
+  function decodeAll() {
+    if (!ctx) return;
+    for (const n of SFX_NAMES) {
+      if (buffers[n] || !raw[n]) continue;
+      const data = raw[n]; raw[n] = null;
+      try {
+        const p = ctx.decodeAudioData(data, (b) => { buffers[n] = b; }, () => {});
+        if (p && p.catch) p.catch(() => {});
+      } catch (e) { /* 舊瀏覽器 */ }
+    }
   }
-  const P = {
-    click() { if (ok("click", 0.04)) { tone(900, 600, 0.06, "square", 0.12); } },
-    build() { if (ok("build", 0.05)) { noise(0.12, 0.35, 900); tone(220, 440, 0.14, "triangle", 0.25); tone(440, 660, 0.12, "triangle", 0.18, 0.08); } },
-    upgrade() { if (ok("up", 0.05)) { [523, 659, 784, 1046].forEach((f, i) => tone(f, f, 0.12, "triangle", 0.2, i * 0.07)); } },
-    sell() { if (ok("sell", 0.05)) { tone(1200, 1500, 0.08, "square", 0.12); tone(1500, 1900, 0.1, "square", 0.12, 0.07); } },
-    deny() { if (ok("deny", 0.15)) tone(200, 140, 0.18, "sawtooth", 0.16); },
-    arrow() { if (ok("arrow", 0.05)) { noise(0.07, 0.18, 3000, 1.5, "bandpass"); tone(1400, 700, 0.05, "triangle", 0.06); } },
-    cannon() { if (ok("cannon", 0.08)) { noise(0.35, 0.6, 400); tone(120, 50, 0.25, "sine", 0.4); } },
-    boom() { if (ok("boom", 0.07)) { noise(0.45, 0.5, 700); tone(90, 40, 0.35, "sine", 0.35); } },
-    frost() { if (ok("frost", 0.07)) { tone(2200, 1800, 0.18, "sine", 0.1); tone(3300, 2600, 0.14, "sine", 0.06, 0.03); noise(0.15, 0.08, 6000, 2, "highpass"); } },
-    zap() { if (ok("zap", 0.08)) { noise(0.18, 0.3, 2500, 4, "bandpass"); tone(880, 220, 0.16, "sawtooth", 0.1); } },
-    hit() { if (ok("hit", 0.035)) tone(300, 160, 0.05, "square", 0.06); },
-    die() { if (ok("die", 0.05)) { noise(0.16, 0.2, 1200); tone(400, 120, 0.16, "triangle", 0.14); } },
-    coin() { if (ok("coin", 0.06)) { tone(1320, 1320, 0.05, "square", 0.07); tone(1760, 1760, 0.08, "square", 0.07, 0.05); } },
-    leak() { if (ok("leak", 0.12)) { tone(330, 160, 0.3, "sawtooth", 0.2); } },
-    wave() { if (ok("wave", 0.3)) { [392, 523, 659].forEach((f, i) => tone(f, f, 0.18, "sawtooth", 0.12, i * 0.12)); } },
-    boss() { if (ok("boss", 1)) { tone(110, 55, 1.2, "sawtooth", 0.3); tone(116, 58, 1.2, "sawtooth", 0.25); noise(1.0, 0.3, 300); } },
-    win() { if (ok("win", 1)) { [523, 659, 784, 1046, 784, 1046].forEach((f, i) => tone(f, f, 0.22, "triangle", 0.22, i * 0.13)); } },
-    lose() { if (ok("lose", 1)) { [392, 349, 311, 262].forEach((f, i) => tone(f, f * 0.98, 0.35, "sawtooth", 0.16, i * 0.25)); } },
-  };
-  return Object.assign(P, {
-    init, get muted() { return muted; },
-    setMuted(m) { muted = m; if (master) master.gain.value = m ? 0 : 0.55; },
-  });
+  function unlock() {
+    ensureCtx(); if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    if (!unlocked) {
+      unlocked = true;
+      try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { /* */ }
+      decodeAll();
+      if (wantTrack) music(wantTrack, true);
+    }
+  }
+  function play(n, opt) {
+    if (!ctx || !unlocked || muted) return;
+    const b = buffers[n]; if (!b) return;
+    const now = ctx.currentTime, lim = LIMIT[n] || 4;
+    playing[n] = (playing[n] || []).filter((t) => t > now);
+    if (playing[n].length >= lim) return;
+    if (lastAt[n] && now - lastAt[n] < 0.045) return;
+    lastAt[n] = now;
+    const s = ctx.createBufferSource(); s.buffer = b;
+    const g = ctx.createGain(); g.gain.value = (opt && opt.vol) || 1;
+    if (opt && opt.rate) s.playbackRate.value = opt.rate; else s.playbackRate.value = 0.94 + Math.random() * 0.12;
+    s.connect(g); g.connect(sfxGain); s.start(0);
+    playing[n].push(now + b.duration / s.playbackRate.value);
+  }
+  const TRACKS = { menu: "menu", level1: "level1", level2: "level2", boss: "boss", win: "win", lose: "lose" };
+  function music(name, force) {
+    wantTrack = name;
+    if (!unlocked) return;
+    if (!force && curTrack === name) return;
+    curTrack = name;
+    if (!musicEl) {
+      musicEl = new Audio(); musicEl.preload = "auto"; musicEl.crossOrigin = "anonymous";
+      musicEl.setAttribute("playsinline", ""); musicEl.addEventListener("error", () => {});
+      try { musicSrc = ctx.createMediaElementSource(musicEl); musicSrc.connect(musicGain); } catch (e) { musicSrc = null; }
+    }
+    if (!name) { musicEl.pause(); return; }
+    musicEl.loop = !(name === "win" || name === "lose");
+    musicEl.src = "audio/music/" + TRACKS[name] + ".mp3";
+    if (!musicSrc) musicEl.volume = muted ? 0 : vMusic;
+    // 淡入
+    if (musicGain) { const t = ctx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(0.0001, t); musicGain.gain.linearRampToValueAtTime(vMusic * 0.8, t + 1.2); }
+    const p = musicEl.play(); if (p && p.catch) p.catch(() => {});
+  }
+  function stopMusic() { wantTrack = null; curTrack = null; if (musicEl) musicEl.pause(); }
+  function pauseMusic(b) { if (!musicEl || !curTrack) return; if (b) musicEl.pause(); else { const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); } }
+  function set(o) {
+    if ("muted" in o) muted = !!o.muted; if ("music" in o) vMusic = o.music; if ("sfx" in o) vSfx = o.sfx;
+    applyVol(); if (musicEl && !musicSrc) musicEl.volume = muted ? 0 : vMusic;
+  }
+  return { preload, unlock, play, music, stopMusic, pauseMusic, set, get unlocked() { return unlocked; }, count: SFX_NAMES.length,
+    get ready() { return Object.keys(buffers).length; } };
 })();

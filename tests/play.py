@@ -1,4 +1,4 @@
-# 實機模擬測試：python3 tests/play.py URL DEVICE OUTDIR
+# 實機模擬測試：python3 tests/play.py URL DEVICE OUTDIR — 片頭（播放／跳過）、建塔、升級、賣出、技能、通關第 1 關、存檔、舊存檔遷移
 import asyncio, sys, json, time, os
 from playwright.async_api import async_playwright
 DEV = {"se": (375, 667, True), "iphone": (390, 844, True), "iphone_land": (844, 390, True),
@@ -26,8 +26,32 @@ async def main():
         async def tap_cell(c, r):
             x, y = await pg.evaluate(f"__td.cellCenter({c},{r})"); await tap_xy(x, y)
         G = lambda expr: pg.evaluate("(()=>{const G=__td.G;return " + expr + "})()")
-        await pg.goto(URL); await pg.wait_for_timeout(800)
-        await pg.evaluate("localStorage.clear()"); await pg.reload(); await pg.wait_for_timeout(800)
+        await pg.goto(URL); await pg.wait_for_timeout(500)
+        await pg.evaluate("localStorage.clear()"); await pg.reload()
+        await pg.wait_for_timeout(250); await pg.screenshot(path=f"{OUT}/{D}_00_loading.png")
+        await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
+        check(await pg.evaluate("__td.imgs()") >= 74, "all images loaded before start screen")
+        await pg.screenshot(path=f"{OUT}/{D}_00_start.png")
+        await tap_sel("#iPlay"); await pg.wait_for_timeout(300)
+        check(await pg.evaluate("!document.querySelector('#iSkip').classList.contains('hidden')"), "skip button visible during intro")
+        full = D in ("pc", "iphone")
+        if full:  # 完整看完片頭並截取影格
+            for t in (2.5, 7, 12, 16.5, 20.5):
+                await pg.wait_for_function(f"document.querySelector('#introV').currentTime>={t}", timeout=40000)
+                await pg.screenshot(path=f"{OUT}/{D}_intro_{str(t).replace('.','_')}s.png")
+            await pg.wait_for_selector("#menu", state="visible", timeout=20000)
+            check(True, "intro played to the end and led to the title menu")
+        else:
+            await pg.wait_for_timeout(3000)
+            vt = await pg.evaluate("document.querySelector('#introV').currentTime")
+            check(vt > 1.0, f"intro video playing (t={vt:.1f}s)")
+            await pg.screenshot(path=f"{OUT}/{D}_intro_3s.png")
+            await tap_sel("#iSkip"); await pg.wait_for_timeout(500)
+            check(await pg.evaluate("!document.querySelector('#menu').classList.contains('hidden')"), "skip intro -> title menu")
+        check(await pg.evaluate("__td.save().introSeen===true"), "intro remembered as seen")
+        await pg.wait_for_timeout(1200)
+        tv = await pg.evaluate("(()=>{const v=document.querySelector('#titleV');return [v.currentSrc.split('/').pop(), v.paused, v.currentTime]})()")
+        check(tv[0].startswith("title_loop") and not tv[1], f"title background video looping {tv}")
         await pg.screenshot(path=f"{OUT}/{D}_01_menu.png")
         await tap_sel("#mStart"); await pg.wait_for_timeout(300)
         await pg.screenshot(path=f"{OUT}/{D}_02_select.png")
@@ -53,18 +77,22 @@ async def main():
                 return (c, r) if ok else None
             return None
         g0 = await G("G.gold")
-        a1 = await build("arrow"); check(a1 is not None, f"place arrow tower by tap at {a1}")
-        c1 = await build("cannon"); check(c1 is not None, f"place cannon tower at {c1}")
+        a1 = await build("spear"); check(a1 is not None, f"place spear tower by tap at {a1}")
+        c1 = await build("lava"); check(c1 is not None, f"place lava tower at {c1}")
         f1 = await build("frost"); check(f1 is not None, f"place frost tower at {f1}")
-        check(await G("G.gold") == g0 - 200, "gold deducted correctly (50+80+70)")
+        check(await G("G.gold") == g0 - 205, "gold deducted correctly (50+85+70)")
         # 升級
-        await tap_cell(*a1); check(await G("G.sel && G.sel.type==='arrow'"), "tap tower opens info panel")
+        await tap_cell(*a1); check(await G("G.sel && G.sel.type==='spear'"), "tap tower opens info panel")
         await pg.screenshot(path=f"{OUT}/{D}_03_info.png")
-        await tap_sel("#bUp"); check(await G("G.towers.find(t=>t.type==='arrow').lvl===1"), "upgrade arrow to Lv2 via button")
+        await tap_sel("#bUp"); check(await G("G.towers.find(t=>t.type==='spear').lvl===1"), "upgrade spear to Lv2 via button")
         # 賣出
-        await tap_sel("#bSell"); check(await G("!G.towers.some(t=>t.type==='arrow')"), "sell tower via button")
-        gs = await G("G.gold"); check(gs == g0 - 200 - 60 + 77, f"sell refund 70% (gold {gs})")
-        a1 = await build("arrow"); check(a1 is not None, "rebuild arrow")
+        await tap_sel("#bSell"); check(await G("!G.towers.some(t=>t.type==='spear')"), "sell tower via button")
+        gs = await G("G.gold"); check(gs == g0 - 205 - 60 + 77, f"sell refund 70% (gold {gs})")
+        a1 = await build("spear"); check(a1 is not None, "rebuild spear")
+        # 技能：隕石（瞄準）與道具：金幣袋
+        await tap_sel("#sk_meteor"); check(await G("G.aim==='meteor'"), "meteor skill enters aim mode")
+        await tap_xy(*(await pg.evaluate("__td.mapPoint(8,5)"))); check(await G("G.cd.meteor>0"), "meteor cast, cooldown started")
+        gb = await G("G.gold"); await tap_sel("#it_goldbag"); check(await G("G.gold") == gb + 150, "gold bag item +150")
         await tap_sel("#bWave"); check(await G("G.waveOn && G.wave===1"), "start wave 1 via button")
         await tap_sel("#bSpeed"); check(await G("G.speed===2"), "speed x2 toggle")
         await tap_sel("#bPause"); check(await G("G.paused"), "pause")
@@ -72,12 +100,12 @@ async def main():
         await tap_sel("#oBtns button"); check(await G("!G.paused"), "resume")
         await pg.wait_for_timeout(2500); await pg.screenshot(path=f"{OUT}/{D}_05_battle.png")
         await pg.evaluate("__td.setDebugSpeed(6)")
-        plan = ["arrow", "tesla", "cannon", "arrow", "frost", "tesla", "arrow", "cannon"]; shot_fx = False; t0 = time.time()
+        plan = ["spear", "lava", "spear", "frost", "lava", "spear", "lava"]; shot_fx = False; t0 = time.time()
         while time.time() - t0 < 420:
             st = await G("({over:G.over,waveOn:G.waveOn,wave:G.wave,waves:G.waves,gold:G.gold,lives:G.lives,n:G.enemies.length,auto:G.auto})")
             if st["over"]: break
             if not st["waveOn"] and st["wave"] < st["waves"]: await tap_sel("#bWave")
-            if plan and st["gold"] >= {"arrow": 50, "cannon": 80, "frost": 70, "tesla": 110}[plan[0]] + 10:
+            if plan and st["gold"] >= {"spear": 50, "lava": 85, "frost": 70}[plan[0]] + 10:
                 if await build(plan[0]): plan.pop(0)
             elif not plan and st["gold"] >= 130:
                 tws = await G("G.towers.filter(t=>t.lvl<2).map(t=>[t.c,t.r])")
@@ -92,11 +120,11 @@ async def main():
         await pg.wait_for_timeout(1200)
         win = await pg.evaluate("document.querySelector('#oTitle').textContent")
         await pg.screenshot(path=f"{OUT}/{D}_07_result.png")
-        check(win == "勝利！", f"level 1 cleared (result='{win}', lives={st['lives']}, towers={st['towers']}, {round(time.time()-t0)}s)")
+        check(win == "防線守住了！", f"level 1 cleared (result='{win}', lives={st['lives']}, towers={st['towers']}, {round(time.time()-t0)}s)")
         sv = await pg.evaluate("__td.save()")
         check(bool(sv) and sv["unlocked"] >= 2 and sv["stars"].get("0", 0) >= 1, f"save written {json.dumps(sv)}")
-        await pg.reload(); await pg.wait_for_timeout(800)
-        sv2 = await pg.evaluate("__td.save()"); check(sv2 == sv, "save persists after reload")
+        await pg.reload(); await pg.wait_for_selector("#menu", state="visible", timeout=30000)
+        sv2 = await pg.evaluate("__td.save()"); check(sv2 == sv, "save persists after reload (intro skipped automatically)")
         await tap_sel("#mStart"); await pg.wait_for_timeout(300)
         check(not await pg.evaluate("document.querySelector('#lv2').classList.contains('lock')"), "level 2 unlocked in menu after reload")
         await pg.screenshot(path=f"{OUT}/{D}_08_select_after.png")
@@ -107,6 +135,14 @@ async def main():
         # 版面不可超出視窗
         ov = await pg.evaluate("""[...document.querySelectorAll('#hud,#panel,.tb,#bWave')].filter(e=>e.offsetParent).map(e=>{const r=e.getBoundingClientRect();return [e.id||e.className,r.left,r.top,r.right,r.bottom]}).filter(a=>a[1]<-1||a[2]<-1||a[3]>innerWidth+1||a[4]>innerHeight+1)""")
         check(not ov, f"no UI overflow {ov}")
+        # 舊版存檔 tdw_save_v1 相容：可讀取、遷移、不刪除舊鍵
+        await pg.evaluate("localStorage.removeItem('dino_save_v1');localStorage.setItem('tdw_save_v1',JSON.stringify({unlocked:3,stars:{0:3,1:2},muted:false}))")
+        await pg.reload(); await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
+        mg = await pg.evaluate("[__td.save().unlocked, __td.save().stars, !!localStorage.getItem('tdw_save_v1'), !!localStorage.getItem('dino_save_v1')]")
+        check(mg[0] == 3 and mg[2] and mg[3], f"old tdw_save_v1 migrated, old key kept {mg}")
+        await pg.evaluate("localStorage.setItem('tdw_save_v1','{broken json')"); await pg.evaluate("localStorage.removeItem('dino_save_v1')")
+        await pg.reload(); await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
+        check(await pg.evaluate("__td.save().unlocked===1 && localStorage.getItem('tdw_save_v1')==='{broken json'"), "corrupt old save does not crash and is not deleted")
         check(not errs, f"no console errors ({len(errs)}) {errs[:5]}")
         await b.close()
     print(f"RESULT {D} fails={len(fails)}")

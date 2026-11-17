@@ -1,31 +1,20 @@
-# 守護之塔 Tower Defense（網頁版）
+# 恐龍防線 Dino Defense
 
-**直接玩：** https://allen640107-gh.github.io/tower-defense-web/
+手機（直向／橫向）與電腦都能玩的恐龍世界塔防網頁遊戲。線上試玩：https://allen640107-gh.github.io/tower-defense-web/
 
-純 HTML5 Canvas + JavaScript，不需要建置工具、沒有外部素材：所有圖形都用 Canvas 向量即時繪製，音效用 WebAudio 程式合成。
+- 7 關：史前叢林、迷霧沼澤、化石峽谷、冰河時期、火山地帶、恐龍巢穴、暴龍王座
+- 6 種塔（各 3 級，可升級／賣出 70%）：石矛塔、火山投石、冰晶塔、毒液花、特斯拉電塔、琥珀晶塔
+- 8 種恐龍：迅猛龍、三角龍、甲龍、翼龍、副櫛龍、棘龍、腕龍，魔王暴龍王
+- 主動技能（冷卻）：隕石、尖刺陷阱、空投補給；道具：草藥、冰凍炸彈、金幣袋、炸藥
+- 環境互動：可敲碎岩石／琥珀岩、沼澤泥坑減速、火山噴氣口、恐龍蛋孵化；關卡事件：空投、翼龍群、落石、寒流、火山爆發、孵化、流星雨
+- 恐龍圖鑑、10 種化石、12 項成就；存檔在 localStorage（`dino_save_v1`，會讀取並遷移舊版 `tdw_save_v1`，舊鍵保留不刪）
+- 片頭動畫（可跳過、看過會記住、主選單可「重看片頭」）、會動的標題背景
 
-## 特色
-- 手機直向／橫向、Android Fold（摺疊與展開）、平板、電腦都能玩；地圖會依螢幕比例自動轉向。
-- 觸控友善：用 Pointer Events，禁止雙擊縮放與頁面捲動，按鈕至少約 46px。
-- 主選單、5 關（地圖與路線各不相同、難度遞增）、勝敗畫面、星數評價。
-- 4 種塔（各 3 級，可升級／賣出退 70%）：
-  - **箭塔**：射速快，可打空中
-  - **砲塔**：範圍爆炸，打不到飛行敵人
-  - **冰塔**：緩速並造成小範圍傷害
-  - **雷塔**：連鎖閃電
-- 5 種敵人＋魔王：步兵、疾風狼（快）、重甲兵（減傷）、夜蝠（飛行）、祭司（治療同伴）、魔王（每關最終波）。
-- 暫停、×2 加速、靜音開關；進度（解鎖、星數、靜音）存在 `localStorage`（鍵名 `tdw_save_v1`）。
-- 鍵盤：1–4 選塔、空白鍵暫停、Esc 取消。
+## 美術與音訊
+- 所有圖像與影片以 Grok Imagine 生成，原圖在 `art/src/`（不會被網頁載入），處理工具 `art/tools/process_art.py`（去背、裁切、壓成 `img/*.webp`）。
+- 音樂與音效全部是免費可商用授權（CC BY 4.0 / CC0），建置工具 `art/tools/build_audio.py`。完整來源與授權見 [CREDITS.md](CREDITS.md)。
 
-## 檔案
-- `index.html`、`css/style.css`
-- `js/game.js`：遊戲主程式（狀態、戰鬥、繪圖、介面）
-- `js/levels.js`：關卡地圖與波次產生
-- `js/audio.js`：WebAudio 合成音效
-- `tests/play.py`：Playwright 實機模擬測試（觸控／滑鼠放塔、升級、賣出、自動打完第 1 關、存檔驗證）
-- `tests/sim.py`：各關平衡模擬
-
-## 本機執行
-```bash
-python3 -m http.server 8000   # 然後打開 http://localhost:8000/
-```
+## 開發
+純 HTML/CSS/JS，無建置步驟：`python3 -m http.server` 後開啟 `index.html`。
+- `js/levels.js` 關卡資料、`js/game.js` 遊戲主程式、`js/audio.js` 音訊、`js/credits.js` 製作名單
+- 測試（需 playwright）：`tests/play.py URL DEVICE OUT`（六種尺寸實機流程）、`tests/sim.py URL LEVEL`（平衡）、`tests/levels_shots.py URL OUT`（每關截圖）
