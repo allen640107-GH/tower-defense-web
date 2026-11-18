@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+<title>恐龍防線 · 遊玩統計</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;background:#000;color:#fff;font-family:system-ui,-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-weight:900;-webkit-text-size-adjust:100%}
+main{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;gap:clamp(16px,4vh,40px);padding:max(20px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));max-width:900px;margin:0 auto}
+h1{margin:0;font-size:clamp(26px,7vw,48px);color:#ffd84a;letter-spacing:.04em}
+.card{border:4px solid #fff;border-radius:18px;padding:clamp(14px,4vw,28px)}
+.lbl{font-size:clamp(22px,6vw,38px);line-height:1.2}
+.num{font-size:clamp(64px,22vw,150px);line-height:1;margin-top:8px;color:#ffd84a;font-variant-numeric:tabular-nums;word-break:break-all}
+.card.b .num{color:#7df9ff}
+.note{font-size:clamp(17px,4.5vw,24px);line-height:1.45;color:#fff}
+.err{color:#ff8a8a}
+button{font:inherit;font-size:clamp(20px,5.5vw,30px);background:#ffd84a;color:#000;border:0;border-radius:14px;padding:14px 22px;min-height:56px;cursor:pointer}
+a{color:#7df9ff}
+</style>
+</head>
+<body>
+<main>
+  <h1>恐龍防線 · 遊玩統計</h1>
+  <section class="card a"><div class="lbl">遊戲開啟次數</div><div class="num" id="vOpen">…</div></section>
+  <section class="card b"><div class="lbl">開始關卡次數</div><div class="num" id="vLevel">…</div></section>
+  <div class="note" id="status">讀取中…</div>
+  <div><button id="reload" type="button">重新整理</button></div>
+  <div class="note">累計總數，不含任何個人資料。<a href="./">回到遊戲</a></div>
+</main>
+<script src="js/counter.js" data-noopen></script>
+<script>
+(function () {
+  var busy = false;
+  function fmt(v) { return typeof v === "number" ? v.toLocaleString("zh-TW") : "—"; }
+  function load() {
+    if (busy) return; busy = true;
+    var st = document.getElementById("status");
+    st.className = "note"; st.textContent = "讀取中…";
+    try {
+      window.DinoCounter.read(function (r) {
+        busy = false;
+        if (!r || (r.opens == null && r.levels == null)) { document.getElementById("vOpen").textContent = "—"; document.getElementById("vLevel").textContent = "—"; st.className = "note err"; st.textContent = "目前連不上計數服務，請稍後再按「重新整理」。"; return; }
+        document.getElementById("vOpen").textContent = fmt(r.opens);
+        document.getElementById("vLevel").textContent = fmt(r.levels);
+        var d = new Date();
+        st.textContent = "更新時間 " + d.toLocaleString("zh-TW", { hour12: false });
+      });
+    } catch (e) { busy = false; st.className = "note err"; st.textContent = "讀取失敗，請稍後再試。"; }
+  }
+  document.getElementById("reload").onclick = load;
+  load();
+})();
+</script>
+</body>
+</html>

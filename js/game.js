@@ -232,6 +232,7 @@ function towerUnlocked(t) { return UNLOCK_TOWER[t] <= G.level; }
 
 // ---------------- 關卡流程 ----------------
 function startLevel(li) {
+  try { window.DinoCounter && window.DinoCounter.levelStart(); } catch (e) {}
   const L = LEVELS[li];
   Object.assign(G, { level: li, L, gold: L.gold, lives: 20, startLives: 20, wave: 0, waves: L.waves, enemies: [], towers: [], projs: [], fx: [], parts: [], bolts: [], texts: [],
     queue: [], spawnT: 0, waveOn: false, auto: -1, speed: 1, paused: false, sel: null, build: null, aim: null, time: 0, shake: 0, over: false,

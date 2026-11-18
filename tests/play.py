@@ -17,6 +17,8 @@ async def main():
         pg = await ctx.new_page(); errs = []
         pg.on("console", lambda m: errs.append("console." + m.type + ": " + m.text) if m.type in ("error", "warning") else None)
         pg.on("pageerror", lambda e: errs.append("pageerror: " + str(e)))
+        counterReqs = []  # 測試不可增加計數器：任何 abacus 請求一律攔下並記錄
+        await ctx.route("**/abacus.jasoncameron.dev/**", lambda r: (counterReqs.append(r.request.url), r.abort())[1])
         async def tap_sel(sel):
             if T: await pg.tap(sel)
             else: await pg.click(sel)
@@ -243,6 +245,8 @@ async def main():
         await pg.evaluate("localStorage.setItem('tdw_save_v1','{broken json')"); await pg.evaluate("localStorage.removeItem('dino_save_v1')")
         await pg.reload(); await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
         check(await pg.evaluate("__td.save().unlocked===1 && localStorage.getItem('tdw_save_v1')==='{broken json'"), "corrupt old save does not crash and is not deleted")
+        check(not counterReqs, f"play test never hits the counter ({len(counterReqs)}) {counterReqs[:3]}")
+        check(await pg.evaluate("!!window.DinoCounter && window.DinoCounter.skip()"), "counter skips test env (webdriver/127.0.0.1)")
         check(not errs, f"no console errors ({len(errs)}) {errs[:5]}")
         await b.close()
     print(f"RESULT {D} fails={len(fails)}")

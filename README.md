@@ -43,6 +43,21 @@ v2.0 存檔（`dino_save_v1`，版本 v < 4）第一次讀入時自動轉換，*
 - 圖鑑、擊倒數、化石、成就、道具、音量設定全部原樣保留；新增的英雄（預設獵人）與收服紀錄自動補上。
 - 更早的「守護之塔」存檔（`tdw_save_v1`）會先轉成 7 關格式，再依上表對應。
 
+## 遊玩統計（匿名計數器）
+
+- 統計頁：<https://allen640107-gh.github.io/tower-defense-web/stats.html>（大字、高對比，手機可看）
+- 只記兩個累計總數：**遊戲開啟次數**、**開始關卡次數**。使用免費、免註冊、免金鑰的 [Abacus](https://abacus.jasoncameron.dev)，不送 cookie、不帶任何識別碼、不讀存檔，不收集個人資料。
+- 請求在一次性 Web Worker 內 fire-and-forget（4 秒逾時、全部 try/catch），計數站連不上時遊戲照常、主控台 0 錯誤。
+- 不計數：localhost、127.0.0.1、file://、自動化測試（`navigator.webdriver`）、網址帶 `?nocount`。`?counttest=1` 會改計到獨立的測試命名空間 `allen-dino-defense-test`，不影響正式數字。
+- 用指令讀數字：
+
+```
+curl -s https://abacus.jasoncameron.dev/get/allen-dino-defense/opens
+curl -s https://abacus.jasoncameron.dev/get/allen-dino-defense/level-starts
+```
+
+（尚未有人開啟時會回 `Key not found`，代表 0。）
+
 ## 美術與音訊
 - 所有圖像與影片以 Grok Imagine 生成，原圖在 `art/src/`（不會被網頁載入），處理工具 `art/tools/process_art.py`（去背、裁切、壓成 `img/*.webp`）。
 - 音樂與音效全部是免費可商用授權（CC BY 4.0 / CC0），建置工具 `art/tools/build_audio.py`。完整來源與授權見 [CREDITS.md](CREDITS.md)。
@@ -50,4 +65,5 @@ v2.0 存檔（`dino_save_v1`，版本 v < 4）第一次讀入時自動轉換，*
 ## 開發
 純 HTML/CSS/JS，無建置步驟：`python3 -m http.server` 後開啟 `index.html`。
 - `js/levels.js` 關卡與章節資料、`js/v21.js` 英雄／馴服／進化／天氣／夜晚／魔王技能、`js/game.js` 遊戲主程式、`js/audio.js` 音訊、`js/credits.js` 製作名單
-- 測試（需 playwright）：`tests/play.py URL DEVICE OUT`（六種尺寸實機流程）、`tests/sim.py URL LEVEL [hunter|tamer]`（平衡：有英雄、不用技能與道具的自動對戰）、`tests/levels_shots.py URL OUT`（每關截圖）
+- 測試（需 playwright）：`tests/play.py URL DEVICE OUT`（六種尺寸實機流程）、`tests/sim.py URL LEVEL [hunter|tamer]`（平衡：有英雄、不用技能與道具的自動對戰）、`tests/levels_shots.py URL OUT`（每關截圖）、`tests/counter_test.py URL [SHOTDIR] [--real]`（計數器：測試環境不計數、封鎖計數網域時主控台 0 錯誤；`--real` 只打測試命名空間）
+- `js/counter.js` 匿名計數器、`stats.html` 統計頁
