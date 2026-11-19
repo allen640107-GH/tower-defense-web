@@ -1,5 +1,7 @@
 # 恐龍防線 製作名單與素材授權（CREDITS）
 
+## 製作人／遊戲企劃：Allen Ho
+
 ## 美術與影片
 - 所有場景地圖、恐龍、防禦塔（6 種 × 3 級）、道具與技能圖示、子彈與特效、介面圖示、石板材質、主選單背景、**片頭影片**（4 個鏡頭剪接）與**標題循環影片**，皆以 **Grok Imagine（xAI）** 生成（GenerateImage / GenerateVideo）。
 - **v2.1 新增**（同樣以 Grok Imagine 生成，原始檔在 `art/src/`）：英雄「原始人獵人・岩牙」「馴龍師・翠拉」（hero_hunter.jpg、hero_tamer.jpg）、12 種進化塔（evo_*.jpg，每張左 a 右 b）、火把塔 3 級（tower_torch.jpg）、6 隻新魔王（boss_carno / croc / quetzal / mammoth / lavadrake / queen.jpg）、天氣與 HUD 圖示（sheet_weather.jpg）、英雄與進化子彈／特效（sheet_fx2.jpg）、霧氣材質（fog_tex.jpg），以及新場景地圖 海岸／天空浮島／地底洞穴（terrain_coast / sky / cave.jpg）與章節世界地圖（worldmap.jpg）。友軍沿用原恐龍圖並加綠色光環與收服圖示。

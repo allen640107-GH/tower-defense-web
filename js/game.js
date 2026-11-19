@@ -1015,7 +1015,9 @@ function buildAch() {
 }
 function buildCredits() {
   const c = CREDITS;
-  let h = "<h3>美術與影片</h3><p>" + esc(c.art) + "</p><h3>音樂（CC BY 4.0）</h3>";
+  const [pr, pn] = c.producer || ["製作人／遊戲企劃", "Allen Ho"];
+  let h = '<div class="prod"><span class="pl">' + esc(pr) + '：</span><span class="pn">' + esc(pn) + "</span></div>";
+  h += "<h3>美術與影片</h3><p>" + esc(c.art) + "</p><h3>音樂（CC BY 4.0）</h3>";
   for (const [t, u] of c.music) h += '<p class="cr">"' + esc(t) + '" Kevin MacLeod (incompetech.com)<br>Licensed under Creative Commons: By Attribution 4.0 License<br>http://creativecommons.org/licenses/by/4.0/ ——' + esc(u) + "</p>";
   h += "<h3>音效（CC0）</h3>";
   for (const [t, u, l] of c.sfx) h += '<p class="cr">' + esc(t) + "<br>" + esc(u) + "・" + esc(l) + "</p>";

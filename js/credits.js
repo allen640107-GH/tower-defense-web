@@ -1,6 +1,7 @@
 "use strict";
 // 製作名單（同步於 CREDITS.md）。音樂與音效皆為免費可商用授權；CC-BY 需標示。
 const CREDITS = {
+  producer: ["製作人／遊戲企劃", "Allen Ho"],
   art: "所有場景、恐龍、防禦塔、道具、特效、介面圖示、主選單背景、片頭影片與標題循環影片，以及 v2.1 的英雄、12 種進化塔、火把塔、6 隻新魔王、天氣圖示、新場景地圖與世界地圖，皆以 Grok Imagine（xAI）生成，再以程式去背、裁切與壓縮。標題文字使用真實字型（Noto Serif CJK TC，SIL Open Font License 1.1）。",
   music: [
     ["Strength of the Titans", "片頭"], ["Five Armies", "主選單"], ["Cretaceous Dawn", "一般關卡 A"], ["Dentaneosuchus Hunt", "一般關卡 B"],
