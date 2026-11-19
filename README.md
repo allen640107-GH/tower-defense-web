@@ -2,6 +2,7 @@
 
 手機（直向／橫向）與電腦都能玩的恐龍世界塔防網頁遊戲。線上試玩：https://allen640107-gh.github.io/tower-defense-web/
 
+- **v2.2**：首次開啟就有大大的「立刻開始 1-1」（片頭只自動播一次，點一下就跳過）；第 4 章起恐龍血量與波數提高；**三星要剩 18 命以上且用過塔進化或技能（含英雄大招）**；塔進化改成全寬底部面板、大字列出兩條分支的數值差異；世界地圖自動捲到目前進度並有章節分頁與左右箭頭；**英雄經驗跨關累積（最高 Lv.10），每級 1 個天賦點**（銳利武器／強韌體魄／大招精通，各 3 級，可免費重配）；魔王戰提示統一排在血條下方並有半透明底；小螢幕戰場放大填滿寬度（上下拖曳捲動）、只顯示已解鎖的塔、友軍有粗外框與血條。存檔版本 5：v2.1 以前的存檔自動轉換，依已解鎖進度補發英雄經驗，星數與進度不變。
 - **v2.1：16 關、7 個章節**，關卡選單是可點選的世界地圖（Grok Imagine 繪製）；有單一路線、**分岔路**與**雙入口**關卡，夜晚與特殊天氣版本，每章最後一關是章節魔王，暴龍王是最終關
 - 7 種塔（各 3 級，可升級／賣出 70%）：石矛塔、火山投石、冰晶塔、毒液花、特斯拉電塔、琥珀晶塔、火把塔（夜晚照明）
 - **塔的進化**：6 種戰鬥塔升到 3 級後可二選一進化，共 12 種（外觀、子彈、效果都不同，賣出仍退 70%）
@@ -65,5 +66,5 @@ curl -s https://abacus.jasoncameron.dev/get/allen-dino-defense/level-starts
 ## 開發
 純 HTML/CSS/JS，無建置步驟：`python3 -m http.server` 後開啟 `index.html`。
 - `js/levels.js` 關卡與章節資料、`js/v21.js` 英雄／馴服／進化／天氣／夜晚／魔王技能、`js/game.js` 遊戲主程式、`js/audio.js` 音訊、`js/credits.js` 製作名單
-- 測試（需 playwright）：`tests/play.py URL DEVICE OUT`（六種尺寸實機流程）、`tests/sim.py URL LEVEL [hunter|tamer]`（平衡：有英雄、不用技能與道具的自動對戰）、`tests/levels_shots.py URL OUT`（每關截圖）、`tests/counter_test.py URL [SHOTDIR] [--real]`（計數器：測試環境不計數、封鎖計數網域時主控台 0 錯誤；`--real` 只打測試命名空間）
+- 測試（需 playwright）：`tests/play.py URL DEVICE OUT`（六種尺寸實機流程）、`tests/sim.py URL LEVEL [hunter|tamer] [heroXP]`（平衡：有英雄、不用技能與道具的自動對戰；英雄經驗預設為第一次玩到該關的預期值，天賦自動分配）、`tests/levels_shots.py URL OUT`（每關截圖）、`tests/counter_test.py URL [SHOTDIR] [--real]`（計數器：測試環境不計數、封鎖計數網域時主控台 0 錯誤；`--real` 只打測試命名空間）
 - `js/counter.js` 匿名計數器、`stats.html` 統計頁

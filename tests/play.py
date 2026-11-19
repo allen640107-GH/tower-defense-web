@@ -36,6 +36,8 @@ async def main():
         await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
         check(await pg.evaluate("__td.imgs()") >= 74, "all images loaded before start screen")
         await pg.screenshot(path=f"{OUT}/{D}_00_start.png")
+        qb = await pg.evaluate("(()=>{const e=document.querySelector('#iQuick'),r=e.getBoundingClientRect();return [!e.classList.contains('hidden'),e.textContent,r.height,parseFloat(getComputedStyle(e).fontSize)]})()")
+        check(qb[0] and "立刻開始" in qb[1] and qb[2] >= 56 and qb[3] >= 22, f"v2.2 first launch shows big quick-start 1-1 button {qb}")
         await tap_sel("#iPlay"); await pg.wait_for_timeout(300)
         check(await pg.evaluate("!document.querySelector('#iSkip').classList.contains('hidden')"), "skip button visible during intro")
         full = D in ("pc", "iphone")
@@ -119,7 +121,10 @@ async def main():
                 tws = await G("G.towers.filter(t=>t.lvl<2).map(t=>[t.c,t.r])")
                 if tws:
                     await tap_cell(*tws[0]); 
-                    if await G("G.sel!==null"): await tap_sel("#bUp"); await tap_cell(*tws[0])
+                    if await G("G.sel!==null && !G.over"):
+                        try: await (pg.tap("#bUp", timeout=3000) if T else pg.click("#bUp", timeout=3000))  # 關卡可能剛好結束，面板關閉
+                        except Exception: pass
+                        if await G("!G.over"): await tap_cell(*tws[0])
             if not shot_fx and st["wave"] >= 3 and st["n"] >= 5:
                 await pg.evaluate("__td.setDebugSpeed(1)"); await pg.wait_for_timeout(600)
                 await pg.screenshot(path=f"{OUT}/{D}_06_fx.png"); shot_fx = True; await pg.evaluate("__td.setDebugSpeed(6)")
@@ -129,6 +134,8 @@ async def main():
         win = await pg.evaluate("document.querySelector('#oTitle').textContent")
         await pg.screenshot(path=f"{OUT}/{D}_07_result.png")
         check(win == "防線守住了！", f"level 1 cleared (result='{win}', lives={st['lives']}, towers={st['towers']}, {round(time.time()-t0)}s)")
+        hz = await pg.evaluate("(()=>{const s=__td.save();return [s.v, s.heroes.hunter.xp, __td.G.usedSkill, s.stars['0'], __td.G.lives]})()")
+        check(hz[0] == 5 and hz[1] > 0 and hz[2] and (hz[3] == 3) == (hz[4] >= 18), f"v2.2 hero XP saved after clear, 3-star needs skill/evo {hz}")
         sv = await pg.evaluate("__td.save()")
         check(bool(sv) and sv["unlocked"] >= 2 and sv["stars"].get("0", 0) >= 1, f"save written {json.dumps(sv)}")
         await pg.reload(); await pg.wait_for_selector("#menu", state="visible", timeout=30000)
@@ -137,16 +144,40 @@ async def main():
         check(not await pg.evaluate("document.querySelector('#lv2').classList.contains('lock')"), "level 2 unlocked in menu after reload")
         await pg.screenshot(path=f"{OUT}/{D}_08_select_after.png")
         await pg.screenshot(path=f"{SH}/{D}_worldmap_progress.png")
+        # v2.2：章節分頁／箭頭、章節標籤不裁切
+        wt = await pg.evaluate("""(()=>{const m=document.querySelector('#wmap').getBoundingClientRect();const tabs=[...document.querySelectorAll('.wtab')];
+          const clip=[...document.querySelectorAll('.wch')].filter(l=>{const r=l.getBoundingClientRect();return r.left<m.left-1||r.right>m.right+1||r.top<m.top-1||r.bottom>m.bottom+1}).map(l=>l.textContent);
+          return {n:tabs.length,sel:tabs.findIndex(t=>t.classList.contains('sel')),clip}})()""")
+        check(wt["n"] == 7 and wt["sel"] == 0 and not wt["clip"], f"v2.2 world map chapter tabs, labels not clipped {wt}")
+        await tap_sel("#wNext"); await pg.wait_for_timeout(500)
+        nx = await pg.evaluate("[[...document.querySelectorAll('.wtab')].findIndex(t=>t.classList.contains('sel')), document.querySelector('#wChName').textContent]")
+        await pg.screenshot(path=f"{SH}/{D}_worldmap_next.png")
+        await tap_sel("#wPrev"); await pg.wait_for_timeout(500)
+        pv = await pg.evaluate("[...document.querySelectorAll('.wtab')].findIndex(t=>t.classList.contains('sel'))")
+        check(nx[0] == 1 and "第 2 章" in nx[1] and pv == 0, f"chapter arrows switch chapter {nx} back {pv}")
+        # v2.2：英雄天賦
+        await tap_sel("#bTal"); await pg.wait_for_timeout(300)
+        tp = await pg.evaluate("[__td.G.screen, __td.talPoints('hunter')]")
+        check(tp[0] == "talents" and tp[1] >= 1, f"talent screen opens with points {tp}")
+        await pg.screenshot(path=f"{SH}/{D}_talents.png")
+        await tap_sel("#tal_atk"); ta = await pg.evaluate("[__td.save().heroes.hunter.tal.atk, __td.talPoints('hunter')]")
+        check(ta[0] == 1 and ta[1] == tp[1] - 1, f"talent point spent and saved {ta}")
+        await tap_sel("#talDone"); await pg.wait_for_timeout(300)
+        check(await G("G.screen==='select'"), "talent screen closes back to world map")
         await tap_sel("#lv2"); await pg.wait_for_timeout(300)
         if not await G("G.screen==='play'"): await tap_sel("#lvGo")
         await pg.wait_for_timeout(600); await pg.screenshot(path=f"{OUT}/{D}_09_level2.png")
         check(await G("G.level===1 && G.paths.length===2"), "level 1-2 (fork, 2 paths) playable")
+        tbs = await pg.evaluate("[...document.querySelectorAll('.tb')].map(b=>b.id.slice(3))")
+        check(len(tbs) >= 1 and await pg.evaluate(f"{json.dumps(tbs)}.length===TORDER.filter(k=>towerUnlocked(k)).length"), f"v2.2 locked towers hidden ({tbs})")
+        ah = await G("G.hero.lvl"); check(ah >= 2, f"hero level carried over into next level (Lv{ah})")
         await pg.wait_for_timeout(2600); await pg.screenshot(path=f"{SH}/{D}_fork_1-2.png")
-        # ---- v2.1：英雄拖曳 ----
+        # ---- v2.1：英雄拖曳 ----（v2.2：小螢幕戰場可上下捲動，先讓英雄出現在畫面內，目標挑畫面內的道路格）
         lay0 = await pg.evaluate("__td.layoutInfo()"); tsz = lay0["ts"]
+        await pg.evaluate("__td.mapPoint(__td.G.hero.x, __td.G.hero.y)"); await pg.wait_for_timeout(150)
         hx, hy = await G("[G.hero.sx, G.hero.sy]"); hy -= tsz * 0.4
-        tgt = await G("(()=>{const ps=__td.pathSet().map(k=>k.split(',').map(Number)).filter(([c,r])=>c>=0&&r>=0&&c<16&&r<10);const h=G.hero;ps.sort((a,b)=>((b[0]-h.x)**2+(b[1]-h.y)**2)-((a[0]-h.x)**2+(a[1]-h.y)**2));return ps[Math.floor(ps.length/3)]})()")
-        tx, ty = await pg.evaluate(f"__td.cellCenter({tgt[0]},{tgt[1]})")
+        tgt = await G("(()=>{const v=__td.view(),L=__td.layoutInfo();const ps=__td.pathSet().map(k=>k.split(',').map(Number)).filter(([c,r])=>c>=0&&r>=0&&c<16&&r<10).filter(([c,r])=>{const y=__td.screenOf(c+.5,r+.5)[1];return y>v.top+L.ts&&y<v.bot-L.ts});const h=G.hero;ps.sort((a,b)=>((b[0]-h.x)**2+(b[1]-h.y)**2)-((a[0]-h.x)**2+(a[1]-h.y)**2));return ps[Math.floor(ps.length/3)]})()")
+        tx, ty = await pg.evaluate(f"__td.screenOf({tgt[0]}+.5,{tgt[1]}+.5)")
         if T:
             cdp = await ctx.new_cdp_session(pg)
             await cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": hx, "y": hy}]})
@@ -162,6 +193,7 @@ async def main():
         check(abs(ht[0] - (tgt[0] + 0.5)) < 0.6 and abs(ht[1] - (tgt[1] + 0.5)) < 0.6, f"hero drag-move by {'touch' if T else 'mouse'} -> target {ht} (cell {tgt})")
         await pg.wait_for_timeout(1500); await pg.screenshot(path=f"{SH}/{D}_hero_drag.png")
         # 點英雄再點地點
+        await pg.evaluate("__td.mapPoint(__td.G.hero.x, __td.G.hero.y)"); await pg.wait_for_timeout(150)
         hx, hy = await G("[G.hero.sx, G.hero.sy]"); await tap_xy(hx, hy - tsz * 0.4)
         check(await G("G.heroSel===true"), "tap hero selects it")
         t2 = await G("(()=>{const ps=__td.pathSet().map(k=>k.split(',').map(Number)).filter(([c,r])=>c>=0&&r>=0&&c<16&&r<10);return ps[0]})()")
@@ -187,6 +219,11 @@ async def main():
         for _ in range(2): await tap_sel("#bUp")
         check(await G("G.sel && G.sel.lvl===2") and "進化" in await pg.evaluate("document.querySelector('#bUp').textContent"), "Lv3 tower shows evolve button")
         await tap_sel("#bUp"); check(await pg.evaluate("!!document.querySelector('#evoA') && !!document.querySelector('#evoB')"), "evolution choices shown")
+        es = await pg.evaluate("""(()=>{const e=document.querySelector('#evoSheet'),r=e.getBoundingClientRect(),a=document.querySelector('#evoA').getBoundingClientRect(),b=document.querySelector('#evoB').getBoundingClientRect();
+          const fs=Math.min(...[...e.querySelectorAll('.evoCard td,.evoCard th')].map(x=>parseFloat(getComputedStyle(x).fontSize)));
+          const ov=!(a.right<=b.left+1||b.right<=a.left+1||a.bottom<=b.top+1||b.bottom<=a.top+1);
+          return {vis:!e.classList.contains('hidden'),w:Math.round(r.width),full:r.width>=Math.min(innerWidth-2,880),bottom:Math.abs(r.bottom-innerHeight)<3,inside:r.top>=0&&a.left>=0&&b.right<=innerWidth+1&&a.bottom<=innerHeight+1&&b.bottom<=innerHeight+1,overlap:ov,minFont:fs,rows:e.querySelectorAll('#evoA tr').length}})()""")
+        check(es["vis"] and es["full"] and es["bottom"] and es["inside"] and not es["overlap"] and es["minFont"] >= 15 and es["rows"] >= 4, f"v2.2 evolution bottom sheet: full width, no overlap, large text, branch diff rows {es}")
         await pg.screenshot(path=f"{SH}/{D}_evo_choice.png")
         sp0 = await G("G.sel.spent"); await tap_sel("#evoA")
         check(await G(f"(()=>{{const t=G.towers.find(t=>t.c==={ev[0]}&&t.r==={ev[1]});return t&&t.evo==='a'}})()"), "tower evolved to branch A")
@@ -226,11 +263,24 @@ async def main():
         ov = await pg.evaluate("""[...document.querySelectorAll('#hud,#panel,.tb,#bWave')].filter(e=>e.offsetParent).map(e=>{const r=e.getBoundingClientRect();return [e.id||e.className,r.left,r.top,r.right,r.bottom]}).filter(a=>a[1]<-1||a[2]<-1||a[3]>innerWidth+1||a[4]>innerHeight+1)""")
         check(not ov, f"no UI overflow {ov}")
         # 舊版存檔 tdw_save_v1 相容：可讀取、遷移、不刪除舊鍵
+        # v2.2：v2.1 存檔（v:4）→ v5：星數、進度、物品保留，英雄依進度補發經驗
+        await pg.evaluate("__td.G.paused=true")  # 關卡中切走分頁會暫停並存英雄經驗；先暫停，避免重新整理時覆寫測試用存檔
+        await pg.evaluate("localStorage.setItem('dino_save_v1',JSON.stringify({v:4,unlocked:9,stars:{0:3,1:3,2:2,3:3,4:1,5:2,6:3,7:1},muted:false,introSeen:true,hero:'tamer',tamed:{raptor:2},seen:{raptor:true},kills:{raptor:30},fossils:{raptorclaw:true},ach:{win1:true},items:{potion:1,frostbomb:2,goldbag:0,dynamite:1},st:{kills:300,built:50,meteors:9,rocks:2,eggs:1,bosses:2,ults:7},legacy7:null}))")
+        await pg.reload(); await pg.wait_for_selector("#menu", state="visible", timeout=30000)
+        m3 = await pg.evaluate("(()=>{const s=__td.save();return {v:s.v,u:s.unlocked,st:s.stars,hero:s.hero,tamed:s.tamed,items:s.items,ults:s.st.ults,hx:s.heroes.hunter.xp,tx:s.heroes.tamer.xp,tal:s.heroes.tamer.tal,mig:s.migratedV22,exp:__td.HERO_XP_START[8]}})()")
+        check(m3["v"] == 5 and m3["u"] == 9 and m3["st"] == {"0": 3, "1": 3, "2": 2, "3": 3, "4": 1, "5": 2, "6": 3, "7": 1} and m3["hero"] == "tamer" and m3["tamed"] == {"raptor": 2}
+              and m3["items"]["frostbomb"] == 2 and m3["ults"] == 7 and m3["hx"] == m3["exp"] and m3["tx"] == m3["exp"] and m3["tal"] == {"atk": 0, "hp": 0, "ult": 0} and m3["mig"], f"v2.1 save migrated to v2.2, hero XP granted {m3}")
+        await tap_sel("#mStart"); await pg.wait_for_timeout(600)
+        sc = await pg.evaluate("""(()=>{const w=document.querySelector('#world').getBoundingClientRect(),n=document.querySelector('#lv9').getBoundingClientRect();return [n.left>=w.left-1&&n.right<=w.right+1&&n.top>=w.top-1&&n.bottom<=w.bottom+1,[...document.querySelectorAll('.wtab')].findIndex(t=>t.classList.contains('sel'))]})()""")
+        check(sc[0] and sc[1] == 2, f"world map auto-scrolls to current progress (3-3 in view, chapter 3 tab) {sc}")
+        await pg.screenshot(path=f"{SH}/{D}_worldmap_autoscroll.png")
+        await pg.reload(); await pg.wait_for_selector("#menu", state="visible", timeout=30000)
+        check(await pg.evaluate("__td.save().heroes.tamer.xp") == m3["exp"], "v2.2 migration one-time (XP not re-granted)")
         # v2.0 恐龍防線存檔（7 關）→ v2.1（16 關）：通關進度與星數依對應表保留
         await pg.evaluate("localStorage.setItem('tdw_save_v1',JSON.stringify({unlocked:2,stars:{0:1}}));localStorage.setItem('dino_save_v1',JSON.stringify({v:2,unlocked:5,stars:{0:3,1:3,2:2,3:1},muted:true,introSeen:true,seen:{raptor:true},kills:{raptor:5,trex:1},fossils:{raptorclaw:true},ach:{win1:true},items:{potion:2,frostbomb:0,goldbag:1,dynamite:3},st:{kills:40,built:9,meteors:2,rocks:1,eggs:0,bosses:1}}))")
         await pg.reload(); await pg.wait_for_selector("#menu", state="visible", timeout=30000)
         m2 = await pg.evaluate("(()=>{const s=__td.save();return {u:s.unlocked,st:s.stars,v:s.v,hero:s.hero,tamed:s.tamed,kills:s.kills,fos:s.fossils,ach:s.ach,items:s.items,leg:s.legacy7,old:!!localStorage.getItem('tdw_save_v1')}})()")
-        check(m2["u"] == 13 and m2["st"] == {"0": 3, "3": 3, "6": 2, "9": 1} and m2["v"] == 4 and m2["hero"] == "hunter" and m2["tamed"] == {} and m2["kills"].get("raptor") == 5
+        check(m2["u"] == 13 and m2["st"] == {"0": 3, "3": 3, "6": 2, "9": 1} and m2["v"] == 5 and m2["hero"] == "hunter" and m2["tamed"] == {} and m2["kills"].get("raptor") == 5
               and m2["fos"].get("raptorclaw") and m2["ach"].get("win1") and m2["items"]["dynamite"] == 3 and m2["leg"]["unlocked"] == 5 and m2["old"], f"v2.0 save migrated to 16 levels, nothing lost {m2}")
         await tap_sel("#mStart"); await pg.wait_for_timeout(500)
         check(await pg.evaluate("!document.querySelector('#lv13').classList.contains('lock') && document.querySelector('#lv14').classList.contains('lock')"), "migrated progress shown on world map (5-2 open, 6-1 locked)")

@@ -2,8 +2,8 @@
 // 恐龍防線：關卡資料。座標為 16×10 地圖格（欄, 列）；路徑從畫面外進入。
 // props: rock（可破壞岩石）、amberrock（琥珀岩，獎勵較多）、mud（沼澤泥坑，路上減速）、
 //        vent（火山噴氣口，定期噴發傷害附近恐龍）、egg（恐龍蛋，到時會孵出迅猛龍，可先點破）
-// v2.1：16 關、7 個章節。old 欄位 = v2.0 的第幾關（舊存檔對應用，見 README「關卡對應」）。
-// path：單一路線；paths：多條路線（分岔路或多入口，敵人輪流走不同路線）。bossType：章節魔王（只在章節最後一關出現）。
+// v2.1：16 關、7 個章節。v2.2：第 4 章起提高血量與波數。old 欄位 = v2.0 的第幾關（舊存檔對應用，見 README「關卡對應」）。
+// late：[從第幾波起, 額外血量倍率]，讓終章最後幾波更硬。path：單一路線；paths：多條路線（分岔路或多入口，敵人輪流走不同路線）。bossType：章節魔王（只在章節最後一關出現）。
 const CHAPTERS = [
   { name: "史前叢林", levels: [0, 1, 2], boss: "carno" },
   { name: "迷霧沼澤・海岸", levels: [3, 4, 5], boss: "croc" },
@@ -63,40 +63,40 @@ const LEVELS = [
     events: [{ wave: 4, type: "pterostorm" }, { wave: 5, type: "weather", to: "fog" }, { wave: 6, type: "airdrop" }], fossil: "trikehorn",
     tip: "雙入口，第 5 波起霧。章節魔王「風神翼龍」會用狂風吹暈附近的塔，塔要分散蓋。" },
   // ── 第 4 章 冰河時期 ──
-  { code: "4-1", ch: 3, old: 4, name: "冰河時期", bg: "ice", road: "stone", tint: "rgba(120,170,230,.30)", gold: 350, waves: 8, hpMul: 4.0, tier: 5.0, weather: "snow",
+  { code: "4-1", ch: 3, old: 4, name: "冰河時期", bg: "ice", road: "stone", tint: "rgba(120,170,230,.30)", gold: 350, waves: 9, hpMul: 4.2, tier: 5.0, weather: "snow",
     path: [[-1, 1], [13, 1], [13, 4], [2, 4], [2, 7], [14, 7], [14, 10]],
     props: [["rock", 8, 9], ["rock", 0, 6], ["amberrock", 15, 5]],
     events: [{ wave: 3, type: "blizzard" }, { wave: 6, type: "blizzard" }, { wave: 5, type: "airdrop" }], fossil: "ankyloclub",
     tip: "暴風雪讓恐龍變慢、冰晶塔更強；寒流來襲時是升級的好時機。" },
-  { code: "4-2", ch: 3, name: "冰原雙道", bg: "ice", road: "stone", tint: "rgba(70,100,170,.30)", gold: 380, waves: 9, hpMul: 2.33, tier: 4.0, weather: "snow", night: true, boss: 3800, bossType: "mammoth",
+  { code: "4-2", ch: 3, name: "冰原雙道", bg: "ice", road: "stone", tint: "rgba(70,100,170,.30)", gold: 380, waves: 10, hpMul: 2.8, tier: 4.0, weather: "snow", night: true, boss: 4800, bossType: "mammoth",
     paths: [[[-1, 6], [4, 6], [4, 2], [9, 2], [9, 8], [16, 8]], [[13, -1], [13, 4], [9, 4], [9, 8], [16, 8]]],
     props: [["rock", 6, 4], ["amberrock", 15, 2], ["rock", 2, 9]],
     events: [{ wave: 4, type: "blizzard" }, { wave: 6, type: "airdrop" }], fossil: "ankyloclub",
     tip: "雪夜雙入口！長毛象王會踩地冰封附近的塔，還會披上冰甲。" },
   // ── 第 5 章 地底洞穴・火山 ──
-  { code: "5-1", ch: 4, name: "地底洞穴", bg: "cave", road: "stone", tint: "rgba(20,10,40,.20)", gold: 420, waves: 9, hpMul: 2.25, tier: 4.0, weather: "clear", night: true,
+  { code: "5-1", ch: 4, name: "地底洞穴", bg: "cave", road: "stone", tint: "rgba(20,10,40,.20)", gold: 420, waves: 10, hpMul: 2.75, tier: 4.0, weather: "clear", night: true,
     paths: [[[-1, 4], [3, 4], [3, 1], [12, 1], [12, 4], [16, 4]], [[-1, 4], [3, 4], [3, 8], [8, 8], [8, 6], [12, 6], [12, 4], [16, 4]]],
     props: [["rock", 7, 3], ["amberrock", 14, 7], ["rock", 1, 8], ["amberrock", 6, 6]],
     events: [{ wave: 5, type: "rockslide" }, { wave: 7, type: "airdrop" }], fossil: "spinosail",
     tip: "洞穴一片漆黑：路分成上下兩條再匯合，兩邊都要有火把照明。" },
-  { code: "5-2", ch: 4, old: 5, name: "火山地帶", bg: "volcano", road: "stone", tint: "rgba(60,20,10,.35)", gold: 380, waves: 9, hpMul: 4.2, tier: 5.4, weather: "ash", boss: 6400, bossType: "lavadrake",
+  { code: "5-2", ch: 4, old: 5, name: "火山地帶", bg: "volcano", road: "stone", tint: "rgba(60,20,10,.35)", gold: 380, waves: 10, hpMul: 4.9, tier: 5.4, weather: "ash", boss: 7600, bossType: "lavadrake",
     path: [[-1, 5], [2, 5], [2, 1], [6, 1], [6, 8], [9, 8], [9, 2], [12, 2], [12, 8], [16, 8]],
     props: [["vent", 4, 4], ["vent", 10, 5], ["vent", 14, 3], ["rock", 0, 8], ["amberrock", 7, 4]],
     events: [{ wave: 6, type: "eruption" }, { wave: 8, type: "airdrop" }], fossil: "spinosail",
     tip: "火山灰讓火系更強；章節魔王「熔岩龍」的龍息會燒暈最近的塔。" },
   // ── 第 6 章 恐龍巢穴 ──
-  { code: "6-1", ch: 5, name: "巢穴外圍", bg: "nest", road: "dirt", tint: "rgba(60,70,40,.18)", gold: 400, waves: 9, hpMul: 2.4, tier: 5.2, weather: "rain",
+  { code: "6-1", ch: 5, name: "巢穴外圍", bg: "nest", road: "dirt", tint: "rgba(60,70,40,.18)", gold: 400, waves: 10, hpMul: 2.95, tier: 5.2, weather: "rain",
     paths: [[[-1, 1], [6, 1], [6, 5], [16, 5]], [[3, 10], [3, 7], [10, 7], [10, 5], [16, 5]]],
     props: [["egg", 8, 3], ["egg", 13, 8], ["rock", 1, 4], ["amberrock", 14, 2]],
     events: [{ wave: 4, type: "hatch" }, { wave: 5, type: "airdrop" }], fossil: "eggfossil",
     tip: "雨中的巢穴外圍：兩個入口，先點破恐龍蛋！" },
-  { code: "6-2", ch: 5, old: 6, name: "恐龍巢穴", bg: "nest", road: "dirt", tint: "rgba(90,60,20,.22)", gold: 420, waves: 9, hpMul: 2.7, tier: 5.6, weather: "clear", night: true, boss: 5400, bossType: "queen",
+  { code: "6-2", ch: 5, old: 6, name: "恐龍巢穴", bg: "nest", road: "dirt", tint: "rgba(90,60,20,.22)", gold: 420, waves: 10, hpMul: 3.15, tier: 5.6, weather: "clear", night: true, boss: 6800, bossType: "queen",
     path: [[-1, 8], [3, 8], [3, 3], [8, 3], [8, 7], [12, 7], [12, 1], [16, 1]],
     props: [["egg", 5, 5], ["egg", 10, 5], ["egg", 14, 3], ["rock", 1, 1], ["amberrock", 6, 9]],
     events: [{ wave: 4, type: "hatch" }, { wave: 4, type: "weather", to: "rain" }, { wave: 7, type: "hatch" }, { wave: 5, type: "airdrop" }], fossil: "eggfossil",
     tip: "巢穴之夜：迅猛龍女王會召喚迅猛龍群！恐龍蛋會孵化，先點破它。" },
   // ── 終章 暴龍王座 ──
-  { code: "7-1", ch: 6, old: 7, name: "暴龍王座", bg: "lair", road: "stone", tint: "rgba(80,10,10,.30)", gold: 420, waves: 10, hpMul: 3.0, tier: 6.0, weather: "ash", night: true, boss: 11000, bossType: "trex",
+  { code: "7-1", ch: 6, old: 7, name: "暴龍王座", bg: "lair", road: "stone", tint: "rgba(80,10,10,.30)", gold: 420, waves: 12, hpMul: 3.4, late: [10, 1.4], tier: 6.0, weather: "ash", night: true, boss: 15500, bossType: "trex",
     path: [[8, -1], [8, 2], [2, 2], [2, 8], [13, 8], [13, 4], [16, 4]],
     props: [["vent", 5, 5], ["vent", 10, 5], ["rock", 11, 1], ["amberrock", 0, 5], ["rock", 15, 7]],
     events: [{ wave: 5, type: "eruption" }, { wave: 10, type: "meteorshower" }, { wave: 8, type: "airdrop" }], fossil: "trextooth",

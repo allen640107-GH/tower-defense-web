@@ -10,8 +10,30 @@ const HEROES = {
     desc: "藤鞭一次打 2 隻；收服機率 ×1.8、友軍上限 +1。", ult: { name: "群龍衝鋒", cd: 45, aim: false, snd: "ult_tamer", desc: "召喚恐龍群沿路逆衝，撞傷並擊退所有地面恐龍" } },
 };
 const HORDER = ["hunter", "tamer"];
-const HERO_XP = [0, 50, 140, 280, 480];
+// v2.2：英雄經驗跨關累積（存在存檔 save.heroes），上限 Lv10；每升一級得 1 天賦點
+const HERO_MAX = 10;
+const HERO_XP = [0, 250, 650, 1250, 2100, 3200, 4600, 6300, 8400, 11000]; // 到達 Lv(i+1) 需要的累積經驗
 const HERO_RESPAWN = 14;
+// 第一次通關到第 i 關開始時大約累積的經驗（舊存檔遷移與平衡測試用）
+const HERO_XP_START = [0, 330, 670, 1200, 1730, 2280, 3020, 3810, 4670, 5540, 6700, 8100, 9450, 10900, 12350, 13800];
+const TALENTS = {
+  atk: { name: "銳利武器", max: 3, desc: "攻擊力 +12%" },
+  hp: { name: "強韌體魄", max: 3, desc: "生命 +15%・復活快 2 秒" },
+  ult: { name: "大招精通", max: 3, desc: "大招冷卻 -12%・威力 +10%" },
+};
+const TALORDER = ["atk", "hp", "ult"];
+function heroLvlFromXp(xp) { let l = 1; while (l < HERO_MAX && xp >= HERO_XP[l]) l++; return l; }
+function heroRec(type) {
+  if (!save.heroes || typeof save.heroes !== "object") save.heroes = {};
+  let r = save.heroes[type];
+  if (!r || typeof r !== "object") r = save.heroes[type] = { xp: 0, tal: {} };
+  r.xp = Math.max(0, +r.xp || 0); if (!r.tal || typeof r.tal !== "object") r.tal = {};
+  for (const k of TALORDER) r.tal[k] = clamp(r.tal[k] | 0, 0, TALENTS[k].max);
+  return r;
+}
+function talPoints(type) { const r = heroRec(type); return heroLvlFromXp(r.xp) - 1 - TALORDER.reduce((a, k) => a + r.tal[k], 0); }
+function autoTalents(type) { const r = heroRec(type); let p = talPoints(type), i = 0; while (p > 0 && i < 30) { const k = TALORDER[i % 3]; if (r.tal[k] < TALENTS[k].max) { r.tal[k]++; p--; } i++; } }
+function heroRespawn(h) { return HERO_RESPAWN - 2 * ((h && h.tal && h.tal.hp) | 0); }
 // 收服機率（魔王與翼龍不可收服）
 const TAME = { raptor: 0.05, trike: 0.045, ankylo: 0.04, parasaur: 0.045, spino: 0.03, brachio: 0.025 };
 const ALLY_CAP = 3;
@@ -226,25 +248,31 @@ function blockStep(e, dt, B) {
 }
 
 // ---------------- 英雄 ----------------
+function heroMaxHp(h) { return Math.round(h.H.hp * (1 + 0.12 * (h.lvl - 1)) * (1 + 0.15 * h.tal.hp)); }
 function makeHero(type) {
-  const H = HEROES[type], d = G.total * 0.55, p = posAt(d);
-  return { isHero: true, type, H, x: p.x, y: p.y, tx: p.x, ty: p.y, home: { x: p.x, y: p.y }, hp: H.hp, max: H.hp, lvl: 1, xp: 0, cd: 0, ucd: 6, dead: 0, face: 1, n: 0, cap: 2, kick: 0, sx: 0, sy: 0, hitT: 0 };
+  const H = HEROES[type], d = G.total * 0.55, p = posAt(d), r = heroRec(type), tal = Object.assign({}, r.tal);
+  const h = { isHero: true, type, H, x: p.x, y: p.y, tx: p.x, ty: p.y, home: { x: p.x, y: p.y }, hp: H.hp, max: H.hp, lvl: heroLvlFromXp(r.xp), xp: r.xp, xp0: r.xp, tal, cd: 0, ucd: 6, dead: 0, face: 1, n: 0, cap: 2, kick: 0, sx: 0, sy: 0, hitT: 0 };
+  h.max = h.hp = heroMaxHp(h);
+  return h;
 }
-function heroStat(h) { const k = 1 + 0.22 * (h.lvl - 1), w = WEATHER[G.weather] || WEATHER.clear; return { dmg: h.H.dmg * k, range: h.H.range * (w.range || 1), rate: h.H.rate }; }
+function heroUltCd(h) { return h.H.ult.cd * (1 - 0.12 * h.tal.ult); }
+function heroStat(h) { const k = (1 + 0.15 * (h.lvl - 1)) * (1 + 0.12 * h.tal.atk), w = WEATHER[G.weather] || WEATHER.clear; return { dmg: h.H.dmg * k, range: h.H.range * (w.range || 1), rate: h.H.rate }; }
+function saveHeroXp() { const h = G.hero; if (!h) return; const r = heroRec(h.type); r.xp = Math.max(r.xp, Math.round(h.xp)); }
 function heroHurt(a) {
   const h = G.hero; if (!h || h.dead > 0) return;
   h.hp -= a; h.hitT = 0.12;
   if (h.hp <= 0) {
-    h.hp = 0; h.deaths = (h.deaths | 0) + 1; h.dead = HERO_RESPAWN; AUDIO.play("hero_die"); toast(h.H.name + " 倒下了！" + HERO_RESPAWN + " 秒後復活", 2);
+    h.hp = 0; h.deaths = (h.deaths | 0) + 1; h.dead = heroRespawn(h); AUDIO.play("hero_die"); toast(h.H.name + " 倒下了！" + Math.round(h.dead) + " 秒後復活", 2);
     burst(h.x, h.y, "#c84a2a", 14); for (const e of G.enemies) if (e.eng === h) e.eng = null; G.heroSel = false;
   }
 }
 function heroXP(v) {
   const h = G.hero; if (!h) return; h.xp += v;
-  while (h.lvl < 5 && h.xp >= HERO_XP[h.lvl]) {
-    h.lvl++; const old = h.max; h.max = Math.round(h.H.hp * (1 + 0.18 * (h.lvl - 1))); h.hp = Math.min(h.max, h.hp + (h.max - old) + h.max * 0.3);
-    AUDIO.play("upgrade"); toast(h.H.name + " 升到 Lv." + h.lvl + "！", 1.8); burst(h.x, h.y, "#ffe27a", 18);
+  while (h.lvl < HERO_MAX && h.xp >= HERO_XP[h.lvl]) {
+    h.lvl++; const old = h.max; h.max = heroMaxHp(h); h.hp = Math.min(h.max, h.hp + (h.max - old) + h.max * 0.3);
+    AUDIO.play("upgrade"); toast(h.H.name + " 升到 Lv." + h.lvl + "！得到 1 個天賦點", 2.2); burst(h.x, h.y, "#ffe27a", 18);
     if (h.lvl >= 5) unlockAch("herolv5");
+    saveHeroXp(); writeSave();
   }
 }
 function updateHero(dt) {
@@ -274,8 +302,8 @@ function updateHero(dt) {
 }
 function heroUlt(x, y) {
   const h = G.hero; if (!h || h.dead > 0 || h.ucd > 0) return false;
-  h.ucd = h.H.ult.cd; AUDIO.play(h.H.ult.snd); save.st.ults = (save.st.ults | 0) + 1;
-  const k = (1 + 0.25 * (h.lvl - 1)) * Math.sqrt(G.L.hpMul);
+  h.ucd = heroUltCd(h); AUDIO.play(h.H.ult.snd); save.st.ults = (save.st.ults | 0) + 1; G.usedSkill = true;
+  const k = (1 + 0.15 * (h.lvl - 1)) * (1 + 0.1 * h.tal.ult) * Math.sqrt(G.L.hpMul);
   if (h.type === "hunter") {
     for (let i = 0; i < 14; i++) { const a = rand(0, TAU), r = rand(0, 1.8); G.fx.push({ img: "p_hspear", x: x + Math.cos(a) * r, y: y + Math.sin(a) * r, s: 0.8, t: -i * 0.04, life: 0.55, fall: true, rot: Math.PI / 2 }); }
     G.evT.push({ t: 0.55, f: () => { for (const e of G.enemies) if (!e.dead && (e.x - x) ** 2 + (e.y - y) ** 2 < 2.0 * 2.0) { damage(e, 150 * k); if (!e.dead && !e.E.boss) e.stun = Math.max(e.stun, 1.5); } G.shake = 0.5; burst(x, y, "#d9b38a", 24); } });
@@ -361,7 +389,7 @@ function v21Sprites(list) {
       const s = S(h.home.x, h.home.y);
       list.push({ y: s[1], f: () => {
         ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.beginPath(); ctx.arc(s[0], s[1], ts * 0.55, 0, TAU); ctx.fill();
-        ctx.strokeStyle = "#ffe27a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s[0], s[1], ts * 0.55, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - h.dead / HERO_RESPAWN)); ctx.stroke();
+        ctx.strokeStyle = "#ffe27a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(s[0], s[1], ts * 0.55, -Math.PI / 2, -Math.PI / 2 + TAU * (1 - h.dead / heroRespawn(h))); ctx.stroke();
         sprite(h.H.img, s[0], s[1] + ts * 0.3, ts * 0.9, { alpha: 0.35 });
         ctx.font = "900 " + clamp(Math.round(ts * 0.4), 15, 26) + "px " + FF; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "#000";
         const tx = "復活 " + Math.ceil(h.dead); ctx.strokeText(tx, s[0], s[1] - ts * 0.7); ctx.fillStyle = "#ffe27a"; ctx.fillText(tx, s[0], s[1] - ts * 0.7);
@@ -384,12 +412,19 @@ function v21Sprites(list) {
     const bp = posAt(Math.max(0, a.d - 0.3), a.pi), s = S(a.x, a.y), back = S(bp.x, bp.y), face = back[0] >= s[0] ? 1 : -1;
     list.push({ y: s[1], f: () => {
       const hh = ts * a.E.size * 1.0, by = s[1] + ts * 0.3 - (a.kick > 0 ? ts * 0.06 : 0);
-      ctx.fillStyle = "rgba(90,255,110,.22)"; ctx.beginPath(); ctx.ellipse(s[0], s[1] + ts * 0.26, ts * 0.5, ts * 0.2, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = "rgba(120,255,120,.9)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "rgba(90,255,110,.3)"; ctx.beginPath(); ctx.ellipse(s[0], s[1] + ts * 0.26, ts * 0.55, ts * 0.22, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = "#7dff6a"; ctx.lineWidth = 3; ctx.stroke();
+      // v2.2：友軍粗外框（綠色剪影往 8 個方向外擴），一眼就能和敵人分開
+      const o = Math.max(2.5, ts * 0.075);
+      for (let k = 0; k < 8; k++) { const an = k * Math.PI / 4; sprite(a.E.img, s[0] + Math.cos(an) * o, by + Math.sin(an) * o, hh, { flip: face < 0, tint: "#3dff5a" }); }
       sprite(a.E.img, s[0], by, hh, { flip: face < 0 });
-      sprite(a.E.img, s[0], by, hh, { flip: face < 0, tint: "#4dff6a", alpha: 0.22 + 0.08 * Math.sin(G.time * 4) });
-      centered("i_tame", s[0], by - hh - 4, ts * 0.38);
-      hpBar(s[0], by - hh + 6, ts * 0.7, a.hp / a.max, "#6fe04a");
+      sprite(a.E.img, s[0], by, hh, { flip: face < 0, tint: "#4dff6a", alpha: 0.12 + 0.06 * Math.sin(G.time * 4) });
+      // 粗血條＋收服圖示
+      const bw = Math.max(30, ts * 0.95), bh = Math.max(6, Math.round(ts * 0.16)), bx = s[0] - bw / 2, byy = by - hh - bh - 4;
+      ctx.fillStyle = "#000"; ctx.fillRect(bx - 2, byy - 2, bw + 4, bh + 4);
+      ctx.fillStyle = "#1d3a14"; ctx.fillRect(bx, byy, bw, bh);
+      ctx.fillStyle = a.hp / a.max > 0.3 ? "#5dff4a" : "#ffcf3a"; ctx.fillRect(bx, byy, bw * clamp(a.hp / a.max, 0, 1), bh);
+      centered("i_tame", bx - ts * 0.12, byy + bh / 2, ts * 0.42);
     } });
   }
   if (G.stampede) {

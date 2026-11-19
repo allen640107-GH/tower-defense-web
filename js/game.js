@@ -32,7 +32,7 @@ const ENEMIES = {
   parasaur: { name: "副櫛龍", hp: 100, spd: 0.85, armor: 0, reward: 12, life: 1, size: 0.9, img: "d_parasaur", heal: true, roar: "roar1", desc: "頭冠發出治癒之聲，替周圍恐龍回血。" },
   spino: { name: "棘龍", hp: 260, spd: 0.85, armor: 3, reward: 20, life: 2, size: 1.12, img: "d_spino", regen: 0.015, roar: "roar2", desc: "背帆吸收熱能，持續自我再生。" },
   brachio: { name: "腕龍", hp: 520, spd: 0.5, armor: 1, reward: 30, life: 3, size: 1.3, img: "d_brachio", roar: "roar1", desc: "體型巨大、血量超厚的移動堡壘。" },
-  trex: { name: "暴龍王", hp: 1000, spd: 0.42, armor: 7, reward: 150, life: 10, size: 2.0, img: "d_trex", boss: true, roar: "boss", desc: "魔王。半血時怒吼，震暈附近的塔並狂暴加速。" },
+  trex: { name: "暴龍王", hp: 1000, spd: 0.42, armor: 7, reward: 150, life: 10, size: 2.0, img: "d_trex", boss: true, roar: "boss", desc: "魔王。半血時怒吼，震暈附近的塔、嚇跑友軍，並狂暴加速。" },
 };
 ENEMIES.trex.skName = "王者怒吼"; ENEMIES.trex.name = "暴龍王";
 Object.assign(ENEMIES, BOSS_ENEMIES);
@@ -62,7 +62,7 @@ const ACH = [
   { id: "bossall", name: "魔王獵人", desc: "擊敗全部 7 種魔王", img: "i_horn" },
   { id: "tamer10", name: "馴龍大師", desc: "累積收服 10 隻恐龍", img: "i_tame" },
   { id: "evolve1", name: "進化！", desc: "第一次讓塔進化", img: "i_evolve" },
-  { id: "herolv5", name: "傳奇英雄", desc: "英雄在關卡中升到 Lv.5", img: "i_star" },
+  { id: "herolv5", name: "傳奇英雄", desc: "英雄升到 Lv.5", img: "i_star" },
   { id: "perfect", name: "完美防線", desc: "任一關無漏網通關", img: "i_heart" },
   { id: "allstars", name: "全三星", desc: "所有關卡皆 3 星", img: "i_star" },
   { id: "builder", name: "建築大師", desc: "累積建造 100 座塔", img: "i_coin" },
@@ -96,7 +96,7 @@ function tinted(name, col) {
 
 // ---------------- 存檔 ----------------
 function newSave() {
-  return { v: 4, hero: "hunter", tamed: {}, unlocked: 1, stars: {}, muted: false, music: 0.7, sfx: 0.9, introSeen: false, seen: {}, kills: {}, fossils: {}, ach: {},
+  return { v: 5, hero: "hunter", heroes: { hunter: { xp: 0, tal: { atk: 0, hp: 0, ult: 0 } }, tamer: { xp: 0, tal: { atk: 0, hp: 0, ult: 0 } } }, tamed: {}, unlocked: 1, stars: {}, muted: false, music: 0.7, sfx: 0.9, introSeen: false, zoom: true, seen: {}, kills: {}, fossils: {}, ach: {},
     items: { potion: 1, frostbomb: 1, goldbag: 1, dynamite: 1 }, st: { kills: 0, built: 0, meteors: 0, rocks: 0, eggs: 0, bosses: 0, tamed: 0, evolved: 0, ults: 0 } };
 }
 let save = newSave();
@@ -114,7 +114,7 @@ function loadSave() {
       }
     } catch (e) { /* 舊存檔損壞就略過 */ }
   }
-  const oldV = s && typeof s === "object" ? (s.v | 0) : 4; // 沒有存檔＝新玩家，不需遷移
+  const oldV = s && typeof s === "object" ? (s.v | 0) : 5; // 沒有存檔＝新玩家，不需遷移
   const d = newSave();
   if (s && typeof s === "object") {
     save = Object.assign(newSave(), s);
@@ -131,6 +131,13 @@ function loadSave() {
     save.unlocked = clamp(OLD_LEVEL_MAP[ou - 1] + 1, 1, LEVELS.length);
     save.v = 4; save.migratedV21 = true;
   }
+  if (oldV < 5) { // v2.1 → v2.2：英雄經驗改為跨關累積；依已解鎖進度補發經驗，舊進度與星數不變
+    const xp = HERO_XP_START[clamp(save.unlocked - 1, 0, HERO_XP_START.length - 1)];
+    save.heroes = {};
+    for (const k of HORDER) { const o = s && s.heroes && s.heroes[k]; save.heroes[k] = o && typeof o === "object" ? o : { xp, tal: {} }; heroRec(k); }
+    save.v = 5; save.migratedV22 = true;
+  }
+  for (const k of HORDER) heroRec(k);
   if (!HEROES[save.hero]) save.hero = "hunter";
   save.music = clamp(+save.music || 0, 0, 1); save.sfx = clamp(+save.sfx || 0, 0, 1);
   writeSave();
@@ -138,7 +145,7 @@ function loadSave() {
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { /* 隱私模式 */ } }
 
 // ---------------- 版面 ----------------
-let W = 0, H = 0, DPR = 1, portrait = false, transposed = false, ts = 40, ox = 0, oy = 0, mapW = 0, mapH = 0, UI = null;
+let W = 0, H = 0, DPR = 1, portrait = false, transposed = false, ts = 40, ox = 0, oy = 0, mapW = 0, mapH = 0, UI = null, oyBase = 0, camMax = 0, camY = 0;
 let bgCanvas = null;
 function layout() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -149,7 +156,11 @@ function layout() {
   function calc(ui) {
     let sk, pan, ax, ay, aw, ah;
     if (ui === "portrait") {
-      sk = clamp(Math.round(Math.min(W / 7.6, 62)), 44, 62); pan = clamp(Math.round(H * 0.2), 150, 220);
+      // v2.2：只顯示已解鎖的塔，面板高度依塔的列數縮放，讓戰場盡量填滿寬度
+      const n = G.level >= 0 ? TORDER.filter((k) => UNLOCK_TOWER[k] <= G.level).length : 4, per = W < 600 ? 4 : 7, rows = Math.ceil(n / per);
+      const rowH = clamp(Math.round(W * 0.17), 62, 86);
+      sk = clamp(Math.round(Math.min(W / 7.6, 62)), 44, 62); pan = Math.max(124, rows * rowH + (rows - 1) * 6 + 16);
+      document.documentElement.style.setProperty("--tbr", rows);
       ax = 6; ay = hud + sk + 6; aw = W - 12; ah = H - hud - sk - pan - 12;
     } else {
       sk = clamp(Math.round(Math.min((H - hud) / 7.4, 64)), 44, 64); pan = clamp(Math.round(W * 0.22), 180, W > 1400 ? 340 : 270);
@@ -163,8 +174,15 @@ function layout() {
   portrait = UI.ui === "portrait"; transposed = UI.tr; ts = Math.max(8, UI.t);
   document.body.classList.toggle("portrait", portrait); document.body.classList.toggle("landscape", !portrait);
   document.body.classList.toggle("wide", W / H > 1.5 && W / H < 2.0);
+  // v2.2：直向小螢幕（如 iPhone SE）放大戰場填滿寬度，放不下的部分可上下拖曳捲動
+  camMax = 0;
+  if (portrait && transposed && save.zoom !== false) {
+    const fill = Math.min(112, Math.floor(UI.aw / ROWS));
+    if (fill > ts && fill * COLS > UI.ah) { ts = fill; camMax = COLS * ts - UI.ah; }
+  }
   mapW = (transposed ? ROWS : COLS) * ts; mapH = (transposed ? COLS : ROWS) * ts;
-  ox = Math.round(UI.ax + (UI.aw - mapW) / 2); oy = Math.round(UI.ay + (UI.ah - mapH) / 2);
+  ox = Math.round(UI.ax + (UI.aw - mapW) / 2); oyBase = camMax ? UI.ay : Math.round(UI.ay + (UI.ah - mapH) / 2);
+  camY = clamp(camY, 0, camMax); oy = oyBase - camY;
   const r = document.documentElement.style, hb = hud - 8, hf = clamp(Math.round(hud * 0.42), 19, 27);
   r.setProperty("--hud", hud + "px"); r.setProperty("--hb", hb + "px"); r.setProperty("--hf", hf + "px"); r.setProperty("--pan", UI.pan + "px");
   r.setProperty("--sk", UI.sk + "px");
@@ -173,6 +191,13 @@ function layout() {
   const tf = clamp(Math.round(m * 0.042), 15, 20); r.setProperty("--tf", tf + "px"); r.setProperty("--tf2", (tf + 3) + "px");
   r.setProperty("--tbh", clamp(Math.floor((H - hud - 16 - 62 - 22) / 4), 52, 120) + "px");
   bgCanvas = null;
+}
+function setCam(y) { camY = clamp(y, 0, camMax); oy = oyBase - camY; }
+function viewTop() { return camMax ? UI.ay : oy; }
+function viewBot() { return camMax ? UI.ay + UI.ah : oy + mapH; }
+function ensureVisible(x, y) { // 讓地圖上的點出現在可視範圍（測試掛鉤與自動捲動用）
+  if (!camMax) return; const sy = S(x, y)[1], m = ts * 1.2;
+  if (sy < UI.ay + m) setCam(camY - (UI.ay + m - sy)); else if (sy > UI.ay + UI.ah - m) setCam(camY + (sy - (UI.ay + UI.ah - m)));
 }
 // 地圖座標（格，浮點）→ 螢幕座標（CSS px）
 function S(x, y) { return transposed ? [ox + y * ts, oy + x * ts] : [ox + x * ts, oy + y * ts]; }
@@ -237,7 +262,7 @@ function startLevel(li) {
   Object.assign(G, { level: li, L, gold: L.gold, lives: 20, startLives: 20, wave: 0, waves: L.waves, enemies: [], towers: [], projs: [], fx: [], parts: [], bolts: [], texts: [],
     queue: [], spawnT: 0, waveOn: false, auto: -1, speed: 1, paused: false, sel: null, build: null, aim: null, time: 0, shake: 0, over: false,
     traps: [], drops: [], cd: { meteor: 0, trap: 0, airdrop: 0 }, slowAll: 0, freezeAll: 0, leaked: 0, kills: 0, evT: [], bossOn: false,
-    allies: [], pools: [], stampede: null, heroSel: false, drag: null, dragPos: null, forceTame: false, evoPick: false, night: !!L.night });
+    allies: [], pools: [], stampede: null, heroSel: false, drag: null, dragPos: null, forceTame: false, evoPick: false, night: !!L.night, usedSkill: false, usedEvo: false });
   $("spdTxt").textContent = "×1"; $("bSpeed").classList.remove("on"); $("bPause").classList.remove("on");
   buildPaths(L.paths || [L.path]); G.spawnN = 0;
   G.props = L.props.map(([type, c, r]) => ({ type, c, r, gone: false, t: rand(0, 10), vent: type === "vent" ? rand(6, 14) : 0, warn: 0 }));
@@ -245,11 +270,12 @@ function startLevel(li) {
   G.hero = makeHero(save.hero);
   setWeather(L.weather || "clear", false);
   bgCanvas = null;
-  showScreen("play"); buildTowerButtons(); buildSkillBar(); updateHud(); updatePanel();
+  camY = 1e9; layout(); setCam(camMax / 2); showScreen("play"); buildTowerButtons(); buildSkillBar(); updateHud(); updatePanel();
   AUDIO.music(li % 2 === 0 ? "level1" : "level2");
   const wx = WEATHER[G.weather] || WEATHER.clear;
   banner(L.code + " " + L.name, (L.bossType ? "章節魔王關・" : "") + (G.weather !== "clear" ? wx.name + "：" + wx.desc + "・" : "") + (G.night ? "夜晚：記得蓋火把塔照明・" : "") + L.tip);
   updateWeatherChip();
+  if (camMax && !G.camHint) { G.camHint = true; setTimeout(() => { if (G.screen === "play") toast("戰場已放大：上下拖曳地圖可以捲動", 2.6); }, 2800); }
 }
 function startWave() {
   if (G.over || G.waveOn || G.wave >= G.waves) return;
@@ -305,8 +331,8 @@ function meteorAt(x, y, dmg, rad) {
 }
 function spawnEnemy(t, d0, pi) {
   if (pi === undefined || pi === null) pi = (G.spawnN++) % G.paths.length;
-  const E = ENEMIES[t], wf = G.waves > 1 ? (G.wave - 1) / (G.waves - 1) : 1, hm = Math.pow(G.L.hpMul, 0.5 + 0.5 * wf) * (1 + 0.1 * (G.wave - 1));
-  const hp = E.boss ? G.L.boss : Math.round(E.hp * hm);
+  const E = ENEMIES[t], wf = G.waves > 1 ? (G.wave - 1) / (G.waves - 1) : 1, hm = Math.pow(G.L.hpMul, 0.5 + 0.5 * wf) * (1 + 0.1 * (G.wave - 1)) * (G.L.late && G.wave >= G.L.late[0] ? G.L.late[1] : 1); // v2.2：late＝[從第幾波起, 血量倍率]（終章最後幾波更硬）
+  const hp = E.boss ? (G.L.boss || Math.round(E.hp * G.L.hpMul)) : Math.round(E.hp * hm);
   const e = { t, E, hp, max: hp, d: d0 || 0.5, pi, x: 0, y: 0, slow: 0, slowT: 0, stun: 0, poison: 0, poisonT: 0, flash: 0, face: 1, healT: 1.5, chargeT: rand(2, 4), charging: 0,
     raged: false, rageT: 0, bob: rand(0, 6), dead: false, sx: 0, sy: 0 };
   const p = posAt(e.d, pi); e.x = p.x; e.y = p.y; const s = S(p.x, p.y); e.sx = s[0]; e.sy = s[1];
@@ -328,8 +354,10 @@ function damage(e, amt, opt) {
   if (e.hp <= 0) kill(e);
 }
 function bossRage(e) {
-  e.raged = true; e.rageT = 4; AUDIO.play("boss"); G.shake = 0.9; banner("暴龍王怒吼！", "附近的塔被震暈");
+  e.raged = true; e.rageT = 4; AUDIO.play("boss"); G.shake = 0.9; banner("暴龍王怒吼！", "附近的塔被震暈，友軍恐龍被嚇跑");
   for (const t of G.towers) { const dx = t.c + 0.5 - e.x, dy = t.r + 0.5 - e.y; if (dx * dx + dy * dy < 2.3 * 2.3) t.stun = 2.5; }
+  // v2.2：王者怒吼會嚇跑附近的友軍（終章不能只靠收服的恐龍擋住暴龍王）
+  for (const a of G.allies) { const dx = a.x - e.x, dy = a.y - e.y; if (dx * dx + dy * dy < 3.2 * 3.2) { a.hp = 0; burst(a.x, a.y, "#9be37a", 10); } }
   G.fx.push({ img: "x_frost", x: e.x, y: e.y, s: 4.6, t: 0, life: 0.6, ring: true });
 }
 function kill(e) {
@@ -472,10 +500,14 @@ function drawCover(g, im, x, y, w, h) {
   g.drawImage(im, x + (w - iw) / 2, y + (h - ih) / 2, iw, ih);
 }
 function bake() {
-  const c = document.createElement("canvas"); c.width = cv.width; c.height = cv.height;
+  const oySave = oy; oy = oyBase;
+  try { bakeInner(); } finally { oy = oySave; }
+}
+function bakeInner() {
+  const c = document.createElement("canvas"); c.width = cv.width; c.height = cv.height + Math.ceil(camMax * DPR);
   const g = c.getContext("2d"), L = G.L, bg = IMG["bg_" + L.bg], D = DPR;
   g.setTransform(D, 0, 0, D, 0, 0);
-  drawCover(g, bg, 0, 0, W, H); g.fillStyle = "rgba(8,5,2,.62)"; g.fillRect(0, 0, W, H);
+  drawCover(g, bg, 0, 0, W, H + camMax); g.fillStyle = "rgba(8,5,2,.62)"; g.fillRect(0, 0, W, H + camMax);
   g.save(); g.beginPath(); g.rect(ox, oy, mapW, mapH); g.clip();
   if (transposed) g.setTransform(0, ts * D, ts * D, 0, ox * D, oy * D); else g.setTransform(ts * D, 0, 0, ts * D, ox * D, oy * D);
   if (bg) g.drawImage(bg, 0, 0, COLS, ROWS);
@@ -516,10 +548,11 @@ function hpBar(sx, sy, w, f, col) {
 function towerH(t) { return ts * (1.18 + t.lvl * 0.12 + (t.evo ? 0.14 : 0)); }
 function render() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  if (G.screen !== "play" || !G.L) { ctx.clearRect(0, 0, W, H); return; }
+  if (G.screen !== "play" || !G.L) { ctx.clearRect(0, 0, W, H); placeNotices(false); return; }
   if (!bgCanvas) bake();
-  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(bgCanvas, 0, 0); ctx.restore();
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(bgCanvas, 0, -Math.round(camY * DPR)); ctx.restore();
   ctx.save();
+  if (camMax) { ctx.beginPath(); ctx.rect(0, UI.ay, W, UI.ah); ctx.clip(); }
   if (G.shake > 0) ctx.translate(rand(-1, 1) * G.shake * 7, rand(-1, 1) * G.shake * 7);
   // 可建造格提示
   if (G.build) {
@@ -655,24 +688,51 @@ function render() {
   // 魔王血條
   const boss = G.enemies.find((e) => e.E.boss);
   if (boss) {
-    const bw = Math.min(mapW - 20, 520), bx = ox + (mapW - bw) / 2, by = oy + 10, f = boss.hp / boss.max;
+    const bw = Math.min(mapW - 20, 520), bx = ox + (mapW - bw) / 2, by = viewTop() + 10, f = boss.hp / boss.max;
     ctx.fillStyle = "rgba(0,0,0,.75)"; ctx.fillRect(bx - 4, by - 4, bw + 8, 30);
     ctx.fillStyle = "#3a0a06"; ctx.fillRect(bx, by, bw, 22);
     const gr = ctx.createLinearGradient(bx, 0, bx + bw, 0); gr.addColorStop(0, "#ff3a1a"); gr.addColorStop(1, "#ffb02a");
     ctx.fillStyle = gr; ctx.fillRect(bx, by, bw * clamp(f, 0, 1), 22);
     ctx.font = "900 18px " + FF; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "#000"; const bt = boss.E.name + " " + Math.ceil(boss.hp); ctx.strokeText(bt, bx + bw / 2, by + 18); ctx.fillStyle = "#fff"; ctx.fillText(bt, bx + bw / 2, by + 18);
   }
+  if (camMax) { // 捲動條：右側顯示目前看到的範圍
+    const tH = UI.ah - 16, th = Math.max(36, tH * UI.ah / mapH), ty = UI.ay + 8 + (tH - th) * (camY / camMax), tx = ox + mapW - 9;
+    ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(tx - 1, UI.ay + 8, 8, tH);
+    ctx.fillStyle = "rgba(255,226,122,.9)"; ctx.fillRect(tx, ty, 6, th);
+  }
+  placeNotices(!!boss);
   if (G.auto > 0 && !G.waveOn && G.wave > 0 && G.wave < G.waves) {
     ctx.font = "900 20px " + FF; ctx.textAlign = "center"; ctx.lineWidth = 4; ctx.strokeStyle = "#000";
-    const t = "下一波 " + Math.ceil(G.auto) + " 秒"; ctx.strokeText(t, ox + mapW / 2, oy + mapH - 14); ctx.fillStyle = "#ffe27a"; ctx.fillText(t, ox + mapW / 2, oy + mapH - 14);
+    const t = "下一波 " + Math.ceil(G.auto) + " 秒"; ctx.strokeText(t, ox + mapW / 2, viewBot() - 14); ctx.fillStyle = "#ffe27a"; ctx.fillText(t, ox + mapW / 2, viewBot() - 14);
   }
 }
 
 // ---------------- UI ----------------
-let toastT = 0, bannerT = 0;
-function toast(msg, sec) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); toastT = sec || 1.6; }
+let toastT = 0, bannerT = 0, noticeKey = "";
+// v2.2：提示堆疊放在地圖上緣（有魔王時在血條正下方）
+function placeNotices(boss) {
+  const play = G.screen === "play", top = play ? viewTop() + (boss ? 42 : 6) : Math.round(H * 0.3), left = play ? ox + 6 : 8, w = play ? mapW - 12 : W - 16;
+  const k = top + "," + left + "," + w + "," + play;
+  if (k === noticeKey) return; noticeKey = k;
+  const n = $("notices"); n.style.top = top + "px"; n.style.left = left + "px"; n.style.width = w + "px";
+}
+// v2.2：提示訊息可同時排多則（最多 3 則，同樣的訊息只延長時間），不會互相覆蓋
+const TOASTS = [];
+function toast(msg, sec) {
+  const box = $("toast"), life = sec || 1.6, old = TOASTS.find((q) => q.msg === msg);
+  if (old) { old.t = life; return; }
+  const el = document.createElement("div"); el.className = "tItem"; el.textContent = msg; box.append(el);
+  TOASTS.push({ msg, el, t: life });
+  while (TOASTS.length > 3) TOASTS.shift().el.remove();
+  box.classList.remove("hidden");
+}
+function clearToasts() { while (TOASTS.length) TOASTS.shift().el.remove(); $("toast").classList.add("hidden"); }
+function tickToasts(dt) {
+  for (let i = TOASTS.length - 1; i >= 0; i--) { const q = TOASTS[i]; q.t -= dt; if (q.t <= 0) { q.el.remove(); TOASTS.splice(i, 1); } }
+  if (!TOASTS.length) $("toast").classList.add("hidden");
+}
 function banner(title, sub) { const b = $("banner"); b.innerHTML = ""; b.append(document.createTextNode(title)); if (sub) { const s = document.createElement("small"); s.textContent = sub; b.append(s); } b.classList.remove("hidden"); b.style.animation = "none"; void b.offsetWidth; b.style.animation = ""; bannerT = 2.6; }
-const SCREENS = ["loading", "intro", "menu", "select", "codex", "ach", "settings", "help", "credits"];
+const SCREENS = ["loading", "intro", "menu", "select", "codex", "ach", "settings", "help", "credits", "talents"];
 function showScreen(s) {
   G.screen = s;
   for (const id of SCREENS) $(id).classList.toggle("hidden", id !== s);
@@ -681,9 +741,9 @@ function showScreen(s) {
   if ($("wx")) $("wx").classList.toggle("hidden", !play);
   if (!play) AUDIO.ambient(null);
   $("overlay").classList.add("hidden");
-  if (!play) { $("banner").classList.add("hidden"); }
+  if (!play) { $("banner").classList.add("hidden"); $("evoSheet").classList.add("hidden"); clearToasts(); }
   const tv = $("titleV");
-  if (s === "menu" || s === "select" || s === "codex" || s === "ach" || s === "settings" || s === "help" || s === "credits") {
+  if (s === "menu" || s === "select" || s === "codex" || s === "ach" || s === "settings" || s === "help" || s === "credits" || s === "talents") {
     if (s === "menu") playTitleLoop(); if (G.screen !== "play") AUDIO.music("menu");
   } else if (tv && !tv.paused) tv.pause();
 }
@@ -705,7 +765,7 @@ function buildTowerButtons() {
   const box = $("towerBtns"); box.innerHTML = "";
   for (const k of TORDER) {
     const T = TOWERS[k], b = document.createElement("button"); b.className = "tb"; b.id = "tb_" + k;
-    if (!towerUnlocked(k)) b.classList.add("lock");
+    if (!towerUnlocked(k)) continue; // v2.2：未解鎖的塔不顯示
     b.innerHTML = '<img src="img/' + T.img + '1.webp" alt=""><span class="nm">' + T.short + '</span><span class="co">' + T.cost + "</span>";
     b.onclick = () => {
       if (!towerUnlocked(k)) { AUDIO.play("deny"); toast(T.name + " 第 " + (UNLOCK_TOWER[k] + 1) + " 關解鎖"); return; }
@@ -749,7 +809,7 @@ function useUlt() {
 function updateSkillBar() {
   const ub = $("sk_ult"), h = G.hero;
   if (ub && h) {
-    const dead = h.dead > 0, cd = dead ? h.dead : h.ucd, max = dead ? HERO_RESPAWN : h.H.ult.cd;
+    const dead = h.dead > 0, cd = dead ? h.dead : h.ucd, max = dead ? heroRespawn(h) : heroUltCd(h);
     ub.querySelector(".cd").style.height = (cd / max * 100) + "%"; ub.querySelector(".cdt").textContent = dead ? "復活" + Math.ceil(cd) : cd > 0 ? Math.ceil(cd) : "";
     ub.classList.toggle("off", cd > 0); ub.classList.toggle("dead", dead);
   }
@@ -765,7 +825,7 @@ function useSkill(k) {
   if (G.cd[k] > 0) { AUDIO.play("deny"); toast(SKILLS[k].name + " 冷卻中"); return; }
   if (SKILLS[k].aim) { G.build = null; G.sel = null; G.aim = G.aim === k ? null : k; AUDIO.play("click"); if (G.aim) toast(k === "trap" ? "點道路放置陷阱" : "點地圖選擇落點", 1.6); refreshSel(); updatePanel(); return; }
   if (k === "airdrop") {
-    G.cd.airdrop = SKILLS.airdrop.cd; const g = 80 + Math.round((G.L.tier || 0) * 15); G.gold += g; AUDIO.play("airdrop"); floatText("+" + g, ox + mapW / 2, oy + mapH / 2, "#ffd25e");
+    G.cd.airdrop = SKILLS.airdrop.cd; G.usedSkill = true; const g = 80 + Math.round((G.L.tier || 0) * 15); G.gold += g; AUDIO.play("airdrop"); floatText("+" + g, ox + mapW / 2, oy + mapH / 2, "#ffd25e");
     if (Math.random() < 0.4) { const it = IORDER[Math.floor(Math.random() * 4)]; save.items[it]++; writeSave(); toast("空投：金幣 +" + g + "、" + ITEMS[it].name + " +1", 2); } else toast("空投：金幣 +" + g, 1.6);
     updateSkillBar();
   }
@@ -783,11 +843,11 @@ function useItem(k) {
 function doAim(mx, my) {
   const k = G.aim; G.aim = null; refreshSel();
   if (k === "ult") { heroUlt(mx, my); updateSkillBar(); return; }
-  if (k === "meteor") { G.cd.meteor = SKILLS.meteor.cd; meteorAt(mx, my, 160 * G.L.hpMul, 1.6); save.st.meteors++; writeSave(); checkAch(); }
+  if (k === "meteor") { G.cd.meteor = SKILLS.meteor.cd; G.usedSkill = true; meteorAt(mx, my, 160 * G.L.hpMul, 1.6); save.st.meteors++; writeSave(); checkAch(); }
   else if (k === "trap") {
     const np = nearestDP(mx, my), p = posAt(np.d, np.pi);
     if ((p.x - mx) ** 2 + (p.y - my) ** 2 > 0.8) { AUDIO.play("deny"); toast("陷阱要放在道路上"); G.aim = "trap"; refreshSel(); return; }
-    G.cd.trap = SKILLS.trap.cd; G.traps.push({ x: p.x, y: p.y, n: 8, dmg: 30 * G.L.hpMul, life: 40 }); AUDIO.play("trap");
+    G.cd.trap = SKILLS.trap.cd; G.usedSkill = true; G.traps.push({ x: p.x, y: p.y, n: 8, dmg: 30 * G.L.hpMul, life: 40 }); AUDIO.play("trap");
   } else if (k === "dynamite") {
     save.items.dynamite--; writeSave(); AUDIO.play("boom"); splash(mx, my, 1.3, 200 * G.L.hpMul, false, true); fxAt("x_boom", mx, my, 2.6, 0.6); G.shake = 0.6; burst(mx, my, "#ffb040", 20);
   }
@@ -801,14 +861,13 @@ function updatePanel() {
     const canEvo = lv >= 2 && !t.evo && EVO[t.type];
     $("infoTitle").textContent = t.evo ? EVO[t.type][t.evo].name + "（進化）" : T.name + " Lv." + (lv + 1);
     if (canEvo && G.evoPick) {
-      const E2 = EVO[t.type], ek = t.c + "," + t.r + ":" + (G.gold >= E2.a.cost) + (G.gold >= E2.b.cost);
-      if (G._evoKey !== ek || !$("evoA")) { G._evoKey = ek;
-      $("infoStats").innerHTML = ["a", "b"].map((k) => '<button class="evo" id="evo' + k.toUpperCase() + '"' + (G.gold < E2[k].cost ? " disabled" : "") + '><img src="img/' + E2[k].img + '.webp" alt=""><span><b>' + E2[k].name + "</b><i>" + E2[k].cost + " 金</i><small>" + E2[k].desc + "</small></span></button>").join("");
-      $("evoA").onclick = () => evolveSel("a"); $("evoB").onclick = () => evolveSel("b"); }
-      $("infoStats").classList.add("evos");
+      const E2 = EVO[t.type], ek = t.c + "," + t.r + ":" + (G.gold >= E2.a.cost) + (G.gold >= E2.b.cost) + G.weather;
+      if (G._evoKey !== ek || !$("evoA")) { G._evoKey = ek; buildEvoSheet(t); }
+      $("evoSheet").classList.remove("hidden");
+      $("infoStats").innerHTML = "選擇進化分支 ▼"; $("infoStats").classList.remove("evos");
       up.textContent = "取消"; up.disabled = false;
     } else {
-      G._evoKey = null; $("infoStats").classList.remove("evos");
+      G._evoKey = null; $("infoStats").classList.remove("evos"); $("evoSheet").classList.add("hidden");
       let tx = "傷害 " + Math.round(st.dmg) + "・射程 " + st.range.toFixed(1) + "<br>" + (t.evo ? EVO[t.type][t.evo].desc : T.desc);
       if (lv < 2) tx += "<br>升級後傷害 " + T.dmg[lv + 1];
       else if (canEvo) tx += "<br>可進化：" + EVO[t.type].a.name + " / " + EVO[t.type].b.name;
@@ -819,10 +878,33 @@ function updatePanel() {
     }
     $("bSell").textContent = "賣出 +" + Math.floor(t.spent * 0.7);
   }
+  if (!t) { $("evoSheet").classList.add("hidden"); G._evoKey = null; }
   const w = $("bWave");
   if (G.waveOn) { w.textContent = "第 " + G.wave + " 波進行中"; w.classList.remove("pulse"); w.disabled = true; }
   else if (G.wave >= G.waves) { w.textContent = "最後一波"; w.disabled = true; }
   else { w.disabled = false; w.textContent = G.wave === 0 ? "開始第 1 波" : "召喚第 " + (G.wave + 1) + " 波"; w.classList.toggle("pulse", G.wave === 0); }
+}
+// v2.2：進化二選一＝全寬底部面板，大字列出兩個分支和目前數值的差異
+function buildEvoSheet(t) {
+  const E2 = EVO[t.type], cur = tstat(t), T = TOWERS[t.type];
+  const f1 = (v) => (Math.round(v * 10) / 10).toString();
+  const dps = (q) => (q.dmg * (q.n || 1) * (q.kind === "chain" ? Math.min(3, q.chain || 1) : 1)) / q.rate + (q.poison || 0);
+  const cmp = (a, b, better) => '<em class="' + (Math.abs(b - a) < 0.05 ? "eq" : (better > 0 ? b > a : b < a) ? "up" : "dn") + '">' + f1(b) + "</em>";
+  const card = (k) => {
+    const E = E2[k], q = tstat(Object.assign({}, t, { evo: k })), poor = G.gold < E.cost;
+    const rows = [
+      ["傷害", f1(cur.dmg), cmp(cur.dmg, q.dmg, 1) + (q.n ? " ×" + q.n + " 隻" : "")],
+      ["攻擊間隔", f1(cur.rate) + "秒", cmp(cur.rate, q.rate, -1) + "秒"],
+      ["射程", f1(cur.range), cmp(cur.range, q.range, 1)],
+      ["約略秒傷", f1(dps(cur)), cmp(dps(cur), dps(q), 1)],
+      ["打飛行", cur.air ? "可" : "不行", '<em class="' + (q.air === !!cur.air ? "eq" : q.air ? "up" : "dn") + '">' + (q.air ? "可" : "不行") + "</em>"],
+    ];
+    return '<button class="evoCard" id="evo' + k.toUpperCase() + '"' + (poor ? " disabled" : "") + '><div class="eh"><img src="img/' + E.img + '.webp" alt=""><div><b>' + esc(E.name) + "</b><i>" + E.cost + " 金" + (poor ? "（不足）" : "") + "</i></div></div>" +
+      '<div class="ed">' + esc(E.desc) + "</div><table>" + rows.map((r) => "<tr><th>" + r[0] + "</th><td>" + r[1] + " → " + r[2] + "</td></tr>").join("") + "</table></button>";
+  };
+  $("evoTitle").textContent = T.name + " Lv.3：選一個進化（只能選一次）";
+  $("evoCards").innerHTML = card("a") + card("b");
+  $("evoA").onclick = () => evolveSel("a"); $("evoB").onclick = () => evolveSel("b");
 }
 function placeTower(type, c, r) {
   const T = TOWERS[type];
@@ -835,7 +917,7 @@ function placeTower(type, c, r) {
 function evolveSel(k) {
   const t = G.sel; if (!t || t.lvl < 2 || t.evo || !EVO[t.type]) return false;
   const E2 = EVO[t.type][k], c = E2.cost; if (G.gold < c) { AUDIO.play("deny"); toast("金幣不足（需要 " + c + "）"); return false; }
-  G.gold -= c; t.spent += c; t.evo = k; G.evoPick = false; t.cd = 0.3;
+  G.gold -= c; t.spent += c; t.evo = k; G.evoPick = false; t.cd = 0.3; G.usedEvo = true;
   AUDIO.play("evolve"); G.fx.push({ img: "i_evolve", x: t.c + 0.5, y: t.r + 0.3, s: 1.8, t: 0, life: 0.9, ring: true }); burst(t.c + 0.5, t.r + 0.5, "#fff3a0", 24);
   banner("進化：" + E2.name, E2.desc); save.st.evolved = (save.st.evolved | 0) + 1; writeSave(); unlockAch("evolve1");
   updateHud(); updatePanel(); return true;
@@ -886,11 +968,15 @@ function checkAch() {
   if (LEVELS.every((_, i) => (save.stars[i] | 0) >= 3)) unlockAch("allstars");
 }
 function endLevel(win) {
-  if (G.over) return; G.over = true; G.build = null; G.aim = null; G.sel = null;
+  if (G.over) return; G.over = true; G.build = null; G.aim = null; G.sel = null; G.evoPick = false; $("evoSheet").classList.add("hidden");
   const li = G.level;
-  let stars = 0;
+  let stars = 0; G.starHint = false;
+  saveHeroXp();
   if (win) {
-    stars = G.lives >= 18 ? 3 : G.lives >= 10 ? 2 : 1;
+    // v2.2：三星 = 剩 18 命以上，且本關用過進化或技能（含英雄大招）
+    const tech = G.usedEvo || G.usedSkill;
+    stars = G.lives >= 18 && tech ? 3 : G.lives >= 10 ? 2 : 1;
+    G.starHint = G.lives >= 18 && !tech;
     save.stars[li] = Math.max(save.stars[li] | 0, stars);
     save.unlocked = Math.max(save.unlocked, Math.min(LEVELS.length, li + 2));
     if (li === 0) unlockAch("win1");
@@ -904,7 +990,7 @@ function endLevel(win) {
   setTimeout(() => {
     $("oTitle").textContent = win ? "防線守住了！" : "營地失守…"; $("oTitle").classList.toggle("lose", !win);
     $("oStars").innerHTML = win ? [0, 1, 2].map((i) => '<img src="img/i_star.webp" class="' + (i < stars ? "" : "off") + '" alt="">').join("") : "";
-    $("oText").innerHTML = win ? "剩餘生命 " + G.lives + "・擊倒 " + G.kills + " 隻恐龍<br>獲得化石：" + FOSSILS[LEVELS[li].fossil].name + "、道具：" + ITEMS[IORDER[li % 4]].name + " +1" : "擊倒 " + G.kills + " 隻恐龍。調整塔的位置再試一次！";
+    $("oText").innerHTML = win ? "剩餘生命 " + G.lives + "・擊倒 " + G.kills + " 隻恐龍" + (G.starHint ? '<br><span class="hint3">三星條件：再用一次塔進化或技能（含英雄大招）</span>' : "") + heroGainTxt() + "<br>獲得化石：" + FOSSILS[LEVELS[li].fossil].name + "、道具：" + ITEMS[IORDER[li % 4]].name + " +1" : "擊倒 " + G.kills + " 隻恐龍。調整塔的位置再試一次！";
     const btns = [];
     if (win && li + 1 < LEVELS.length) btns.push(["下一關", () => startLevel(li + 1), "nextBtn"]);
     btns.push(["重新挑戰", () => startLevel(li), "retryBtn"]);
@@ -913,6 +999,10 @@ function endLevel(win) {
     $("overlay").classList.remove("hidden");
   }, win ? 900 : 700);
 }
+function heroGainTxt() {
+  const h = G.hero; if (!h) return ""; const g = Math.round(h.xp - (h.xp0 || 0));
+  return g > 0 ? "<br>" + esc(h.H.name) + " 經驗 +" + g + "（Lv." + h.lvl + (talPoints(h.type) > 0 ? "・有天賦點可分配" : "") + "）" : "";
+}
 function overlayBtns(list) {
   const box = $("oBtns"); box.innerHTML = "";
   list.forEach(([txt, fn, id], i) => { const b = document.createElement("button"); b.className = "big" + (i ? " alt" : ""); b.textContent = txt; if (id) b.id = id; b.onclick = () => { AUDIO.play("click"); fn(); }; box.append(b); });
@@ -920,8 +1010,9 @@ function overlayBtns(list) {
 function setPaused(p) {
   if (G.over) return; G.paused = p; $("bPause").classList.toggle("on", p);
   if (p) {
+    saveHeroXp(); writeSave();
     $("oTitle").textContent = "暫停"; $("oTitle").classList.remove("lose"); $("oStars").innerHTML = ""; $("oText").textContent = LEVELS[G.level].name + "・第 " + Math.max(1, G.wave) + "/" + G.waves + " 波";
-    overlayBtns([["繼續", () => setPaused(false), "resumeBtn"], ["重新開始", () => startLevel(G.level), "restartBtn"], ["回到選單", () => { G.paused = false; showScreen("menu"); }, "quitBtn"]]);
+    overlayBtns([["繼續", () => setPaused(false), "resumeBtn"], ["重新開始", () => startLevel(G.level), "restartBtn"], ["回到選單", () => { G.paused = false; saveHeroXp(); writeSave(); showScreen("menu"); }, "quitBtn"]]);
     $("overlay").classList.remove("hidden"); AUDIO.pauseMusic(true);
   } else { $("overlay").classList.add("hidden"); AUDIO.pauseMusic(false); }
 }
@@ -930,11 +1021,30 @@ function setPaused(p) {
 function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 function buildHeroPick() {
   const box = $("heroPick"); if (!box) return; box.innerHTML = "";
+  const tb = $("bTal"); if (tb) { const p = talPoints(save.hero); tb.innerHTML = "英雄天賦" + (p > 0 ? '<i class="dot">' + p + "</i>" : ""); }
   for (const k of HORDER) {
     const H = HEROES[k], b = document.createElement("button"); b.className = "hp" + (save.hero === k ? " sel" : ""); b.id = "hero_" + k;
-    b.innerHTML = '<img src="img/' + H.img + '.webp" alt=""><span><b><span class="hpl">' + H.title + "・" + H.name + '</span><span class="hps">' + (k === "hunter" ? "獵人" : "馴龍師") + "</span></b><small>" + H.desc + "<br>大招「" + H.ult.name + "」：" + H.ult.desc + "</small></span>";
+    const lv = heroLvlFromXp(heroRec(k).xp), pts = talPoints(k);
+    b.innerHTML = '<img src="img/' + H.img + '.webp" alt=""><span class="hlv' + (pts > 0 ? " pts" : "") + '">Lv' + lv + '</span><span><b><span class="hpl">' + H.title + "・" + H.name + '</span><span class="hps">' + (k === "hunter" ? "獵人" : "馴龍師") + "</span></b><small>" + H.desc + "<br>大招「" + H.ult.name + "」：" + H.ult.desc + "</small></span>";
     b.onclick = () => { save.hero = k; writeSave(); AUDIO.play("click"); buildHeroPick(); };
     box.append(b);
+  }
+}
+// v2.2 英雄天賦
+function buildTalents() {
+  const k = save.hero, H = HEROES[k], r = heroRec(k), lv = heroLvlFromXp(r.xp), pts = talPoints(k);
+  const nx = lv < HERO_MAX ? HERO_XP[lv] : 0, px = HERO_XP[lv - 1];
+  $("talHead").innerHTML = '<img src="img/' + H.img + '.webp" alt=""><div><b>' + esc(H.title + "・" + H.name) + " Lv." + lv + "</b>" +
+    '<div class="xpbar"><i style="width:' + (lv < HERO_MAX ? Math.round((r.xp - px) / (nx - px) * 100) : 100) + '%"></i></div>' +
+    "<small>" + (lv < HERO_MAX ? "經驗 " + Math.round(r.xp) + " / " + nx : "已達最高等級 Lv." + HERO_MAX) + "</small></div>";
+  $("talPts").textContent = "可分配天賦點：" + pts;
+  const box = $("talList"); box.innerHTML = "";
+  for (const t of TALORDER) {
+    const T = TALENTS[t], n = r.tal[t], row = document.createElement("div"); row.className = "talRow";
+    row.innerHTML = '<div class="tl"><b>' + T.name + "</b><small>" + T.desc + "（每級）</small>" + '<span class="pips">' + [0, 1, 2].map((i) => '<i class="' + (i < n ? "on" : "") + '"></i>').join("") + "</span></div>";
+    const b = document.createElement("button"); b.className = "big talPlus"; b.id = "tal_" + t; b.textContent = n >= T.max ? "滿級" : "＋"; b.disabled = n >= T.max || pts <= 0;
+    b.onclick = () => { if (talPoints(k) <= 0 || r.tal[t] >= T.max) { AUDIO.play("deny"); return; } r.tal[t]++; writeSave(); AUDIO.play("upgrade"); buildTalents(); };
+    row.append(b); box.append(row);
   }
 }
 // v2.1 世界地圖：節點座標為地圖圖片的百分比
@@ -953,8 +1063,33 @@ function lvTags(i) {
   if (L.bossType) t.push('<span class="boss">魔王：' + esc(ENEMIES[L.bossType].name) + "</span>");
   return t.join("");
 }
+function buildTabs() {
+  const box = $("wtabList"); box.innerHTML = "";
+  CHAPTERS.forEach((C, ci) => {
+    const b = document.createElement("button"), open = C.levels[0] + 1 <= save.unlocked;
+    b.className = "wtab" + (open ? "" : " lock"); b.id = "wtab" + (ci + 1); b.dataset.ch = ci;
+    b.innerHTML = '<span class="tn">' + (ci === 6 ? "終" : ci + 1) + '</span><span class="tl">' + (ci === 6 ? "終章" : "第" + (ci + 1) + "章") + "</span>";
+    b.setAttribute("aria-label", (ci === 6 ? "終章" : "第 " + (ci + 1) + " 章") + " " + C.name);
+    b.onclick = () => gotoChapter(ci);
+    box.append(b);
+  });
+}
+function gotoChapter(ci) {
+  ci = clamp(ci, 0, CHAPTERS.length - 1);
+  const C = CHAPTERS[ci]; let li = C.levels[0];
+  for (const i of C.levels) if (i + 1 <= save.unlocked) li = i;
+  selectLevel(li); scrollWorldTo(li, true);
+}
+function scrollWorldTo(i, smooth) {
+  const box = $("world"), m = $("wmap"); if (!box || !m) return;
+  const w = m.offsetWidth, h = m.offsetHeight, [x, y] = WNODE[i];
+  const L = clamp(x * w - box.clientWidth / 2, 0, Math.max(0, w - box.clientWidth)), T = clamp(y * h - box.clientHeight / 2, 0, Math.max(0, h - box.clientHeight));
+  if (smooth && box.scrollTo) box.scrollTo({ left: L, top: T, behavior: "smooth" }); else { box.scrollLeft = L; box.scrollTop = T; }
+}
 function selectLevel(i, quiet) {
-  selLv = i; const L = LEVELS[i], lock = i + 1 > save.unlocked, st = save.stars[i] | 0;
+  selLv = i;
+  document.querySelectorAll(".wtab").forEach((b) => b.classList.toggle("sel", +b.dataset.ch === LEVELS[i].ch));
+  if ($("wChName")) $("wChName").textContent = (LEVELS[i].ch === 6 ? "終章" : "第 " + (LEVELS[i].ch + 1) + " 章") + "・" + CHAPTERS[LEVELS[i].ch].name; const L = LEVELS[i], lock = i + 1 > save.unlocked, st = save.stars[i] | 0;
   document.querySelectorAll(".wn").forEach((b) => b.classList.toggle("sel", b.id === "lv" + (i + 1)));
   $("liName").textContent = L.code + "　" + L.name;
   $("liStars").innerHTML = [0, 1, 2].map((k) => '<img src="img/i_star.webp" class="' + (k < st ? "" : "off") + '" alt="">').join("");
@@ -974,10 +1109,15 @@ function layoutWorld() {
   svg.innerHTML = '<path d="' + d + '" fill="none" stroke="rgba(0,0,0,.55)" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>' +
     '<path d="' + d + '" fill="none" stroke="rgba(255,240,200,.55)" stroke-width="4" stroke-dasharray="2 9" stroke-linecap="round"/>' +
     (done ? '<path d="' + d2 + '" fill="none" stroke="#ffd25e" stroke-width="5" stroke-dasharray="2 9" stroke-linecap="round"/>' : "");
-  if (portrait) { const [x] = WNODE[selLv]; box.scrollLeft = clamp(x * w - box.clientWidth / 2, 0, w); }
+  // 章節標籤不可超出地圖邊緣
+  document.querySelectorAll(".wch").forEach((l, ci) => {
+    const lw = l.offsetWidth, lh = l.offsetHeight, [fx, fy] = WCH[ci];
+    l.style.left = clamp(fx * w, lw / 2 + 4, w - lw / 2 - 4) + "px"; l.style.top = clamp(fy * h, lh / 2 + 4, h - lh / 2 - 4) + "px";
+  });
+  scrollWorldTo(selLv, false);
 }
 function buildLevels() {
-  buildHeroPick();
+  buildHeroPick(); buildTabs();
   const box = $("wnodes"); box.innerHTML = "";
   CHAPTERS.forEach((C, ci) => { const l = document.createElement("div"); l.className = "wch"; l.style.left = WCH[ci][0] * 100 + "%"; l.style.top = WCH[ci][1] * 100 + "%"; l.textContent = (ci === 6 ? "終章" : "第 " + (ci + 1) + " 章") + "・" + C.name; box.append(l); });
   LEVELS.forEach((L, i) => {
@@ -1028,6 +1168,7 @@ function syncSettings() {
   $("vMusic").value = Math.round(save.music * 100); $("vSfx").value = Math.round(save.sfx * 100);
   $("vMusicT").textContent = Math.round(save.music * 100); $("vSfxT").textContent = Math.round(save.sfx * 100);
   $("sMute").textContent = "全部靜音：" + (save.muted ? "開" : "關");
+  $("sZoom").textContent = "小螢幕放大戰場：" + (save.zoom !== false ? "開" : "關");
   document.body.classList.toggle("muted", save.muted);
   AUDIO.set({ muted: save.muted, music: save.music, sfx: save.sfx });
 }
@@ -1075,13 +1216,20 @@ cv.addEventListener("pointerdown", (ev) => {
     const p = cellFromEvent(ev);
     if (heroHit(p.px, p.py)) { G.drag = { x: p.px, y: p.py, moved: false }; G.dragPos = [p.mx, p.my]; try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* */ } return; }
   }
+  if (G.screen === "play" && camMax && !G.over && !G.paused) { // 可捲動：放開時沒有拖動才算點擊
+    G.pan = { y: ev.clientY, c0: camY, moved: false, ev: { clientX: ev.clientX, clientY: ev.clientY } };
+    try { cv.setPointerCapture(ev.pointerId); } catch (e) { /* */ } return;
+  }
   onMapTap(ev);
 });
 cv.addEventListener("pointermove", (ev) => {
-  if (G.screen !== "play") return; const p = cellFromEvent(ev); G.hover = [p.c, p.r]; G.hoverF = [p.mx, p.my];
+  if (G.screen !== "play") return;
+  if (G.pan) { const dy = ev.clientY - G.pan.y; if (G.pan.moved || Math.abs(dy) > 10) { G.pan.moved = true; setCam(G.pan.c0 - dy); } return; }
+  const p = cellFromEvent(ev); G.hover = [p.c, p.r]; G.hoverF = [p.mx, p.my];
   if (G.drag) { if (Math.hypot(p.px - G.drag.x, p.py - G.drag.y) > 10) G.drag.moved = true; G.dragPos = [p.mx, p.my]; }
 });
 function endDrag() {
+  if (G.pan) { const p = G.pan; G.pan = null; if (!p.moved) onMapTap(p.ev); return; }
   if (!G.drag) return; const d = G.drag; G.drag = null;
   if (d.moved && G.dragPos) { moveHero(G.dragPos[0], G.dragPos[1]); G.heroSel = false; }
   else { G.heroSel = !G.heroSel; AUDIO.play("click"); if (G.heroSel) toast("已選取英雄：點地圖任意位置移動（也可直接拖曳）", 2); }
@@ -1100,12 +1248,18 @@ document.addEventListener("click", (ev) => { const b = ev.target.closest && ev.t
 
 $("bWave").onclick = () => { AUDIO.play("click"); startWave(); };
 $("bUp").onclick = upgradeSel; $("bSell").onclick = sellSel;
+$("evoCancel").onclick = () => { G.evoPick = false; AUDIO.play("click"); updatePanel(); };
 $("bPause").onclick = () => { AUDIO.play("click"); setPaused(!G.paused); };
 $("bSpeed").onclick = () => { G.speed = G.speed === 1 ? 2 : G.speed === 2 ? 3 : 1; $("spdTxt").textContent = "×" + G.speed; $("bSpeed").classList.toggle("on", G.speed > 1); AUDIO.play("click"); };
 $("bMute").onclick = () => { save.muted = !save.muted; writeSave(); syncSettings(); AUDIO.play("click"); };
 $("mStart").onclick = () => { AUDIO.play("click"); buildLevels(); showScreen("select"); };
+$("wPrev").onclick = () => { AUDIO.play("click"); gotoChapter(LEVELS[selLv].ch - 1); };
+$("wNext").onclick = () => { AUDIO.play("click"); gotoChapter(LEVELS[selLv].ch + 1); };
 $("sBack").onclick = () => { AUDIO.play("back"); showScreen("menu"); };
 $("lvGo").onclick = () => { if (selLv + 1 > save.unlocked) { AUDIO.play("deny"); toast("先通過前一關"); return; } AUDIO.play("click"); startLevel(selLv); };
+$("bTal").onclick = () => { AUDIO.play("click"); buildTalents(); showScreen("talents"); };
+$("talReset").onclick = () => { const r = heroRec(save.hero); for (const t of TALORDER) r.tal[t] = 0; writeSave(); AUDIO.play("click"); buildTalents(); };
+$("talDone").onclick = () => { AUDIO.play("back"); buildLevels(); showScreen("select"); };
 $("mCodex").onclick = () => { AUDIO.play("click"); buildCodex(); showScreen("codex"); };
 $("mAch").onclick = () => { AUDIO.play("click"); buildAch(); showScreen("ach"); };
 $("mSet").onclick = () => { AUDIO.play("click"); syncSettings(); showScreen("settings"); };
@@ -1120,6 +1274,7 @@ $("mReset").onclick = () => {
 $("vMusic").oninput = (e) => { save.music = e.target.value / 100; writeSave(); syncSettings(); };
 $("vSfx").oninput = (e) => { save.sfx = e.target.value / 100; writeSave(); syncSettings(); };
 $("vSfx").onchange = () => AUDIO.play("coin");
+$("sZoom").onclick = () => { save.zoom = save.zoom === false; writeSave(); syncSettings(); AUDIO.play("click"); layout(); };
 $("sMute").onclick = () => { save.muted = !save.muted; writeSave(); syncSettings(); AUDIO.play("click"); };
 
 // ---------------- 片頭 ----------------
@@ -1128,10 +1283,11 @@ let introTitleTimer = 0;
 function showIntroStart() {
   showScreen("intro"); $("introStart").classList.remove("hidden"); $("iSkip").classList.add("hidden"); $("introTitle").classList.add("hidden");
   $("iEnter").classList.toggle("hidden", !save.introSeen);
+  $("iQuick").classList.toggle("hidden", !!save.introSeen);
 }
 function playIntro() {
   AUDIO.unlock(); AUDIO.stopMusic();
-  showScreen("intro"); $("introStart").classList.add("hidden"); $("iSkip").classList.remove("hidden"); $("introTitle").classList.add("hidden");
+  showScreen("intro"); $("introStart").classList.add("hidden"); $("iSkip").classList.remove("hidden"); $("introTitle").classList.add("hidden"); G._introT = performance.now();
   try { iv.currentTime = 0; } catch (e) { /* */ }
   iv.muted = !!save.muted; iv.volume = save.muted ? 0 : Math.max(0.3, save.music);
   const p = iv.play();
@@ -1150,6 +1306,14 @@ iv.addEventListener("error", () => { if (G.screen === "intro" && $("introStart")
 iv.addEventListener("click", () => { if (!$("iSkip").classList.contains("hidden")) finishIntro(); });
 $("iSkip").onclick = (e) => { e.stopPropagation(); AUDIO.play("click"); finishIntro(); };
 $("iPlay").onclick = () => playIntro();
+// v2.2：第一次開啟就能直接開打 1-1（片頭之後可在選單「重看片頭」）
+$("iQuick").onclick = () => { AUDIO.unlock(); AUDIO.play("click"); save.introSeen = true; writeSave(); clearInterval(introTitleTimer); try { iv.pause(); } catch (e) { /* */ } startLevel(0); };
+// 片頭播放中點畫面任何地方＝跳過
+$("intro").addEventListener("pointerdown", (e) => {
+  if ($("iSkip").classList.contains("hidden") || G.screen !== "intro" || performance.now() - (G._introT || 0) < 450) return;
+  if (e.target && e.target.id === "iSkip") return;
+  e.preventDefault(); AUDIO.play("click"); finishIntro();
+});
 $("iEnter").onclick = () => { AUDIO.unlock(); save.introSeen = true; writeSave(); G.screen = "intro"; finishIntro(); };
 
 // ---------------- 載入 ----------------
@@ -1174,7 +1338,7 @@ function frame(ts0) {
     if ((G.time * 4 | 0) !== G._amb) { G._amb = G.time * 4 | 0; AUDIO.ambient((WEATHER[G.weather] || {}).amb || null); }
     if (!G.waveOn) { const w = $("bWave"); const want = G.wave === 0 ? "開始第 1 波" : G.wave >= G.waves ? "最後一波" : "召喚第 " + (G.wave + 1) + " 波"; if (w.textContent !== want || w.disabled !== (G.wave >= G.waves)) updatePanel(); }
   } else if (G.screen === "play" && G.over) { for (const q of G.parts) { q.t += dt; } }
-  if (toastT > 0) { toastT -= dt; if (toastT <= 0) $("toast").classList.add("hidden"); }
+  if (TOASTS.length) tickToasts(dt);
   if (bannerT > 0) { bannerT -= dt; if (bannerT <= 0) $("banner").classList.add("hidden"); }
   render();
   requestAnimationFrame(frame);
@@ -1186,9 +1350,9 @@ document.addEventListener("visibilitychange", () => { if (document.hidden && G.s
 // 測試掛鉤（playwright 用）
 if ($("wx")) $("wx").onclick = () => { AUDIO.play("click"); banner($("wxT").textContent, weatherInfo().replace(/\n/g, " ／ ")); };
 window.__td = {
-  G, save: () => JSON.parse(JSON.stringify(save)), cellCenter: (c, r) => S(c + 0.5, r + 0.5), mapPoint: (x, y) => S(x, y),
+  G, save: () => JSON.parse(JSON.stringify(save)), cellCenter: (c, r) => { ensureVisible(c + 0.5, r + 0.5); return S(c + 0.5, r + 0.5); }, mapPoint: (x, y) => { ensureVisible(x, y); return S(x, y); }, cam: () => ({ camY, camMax }), setCam, screenOf: (x, y) => S(x, y), view: () => ({ top: viewTop(), bot: viewBot() }), heroRec, talPoints, HERO_XP_START,
   buildable, pathSet: () => [...G.pathSet], setDebugSpeed: (v) => { G.dbgSpeed = v; }, addGold: (v) => { G.gold += v; },
-  layoutInfo: () => ({ W, H, ts, ox, oy, mapW, mapH, portrait, transposed }), imgs: () => Object.keys(IMG).length, audioReady: () => AUDIO.ready,
+  layoutInfo: () => ({ W, H, ts, ox, oy, mapW, mapH, portrait, transposed, camMax, viewW: UI.aw, viewH: UI.ah }), imgs: () => Object.keys(IMG).length, audioReady: () => AUDIO.ready,
   startLevel, finishIntro, upgradeSel, sellSel, evolveSel, TOWERS, ENEMIES, LEVELS, EVO, WEATHER,
   hero: () => G.hero, forceTame: () => { G.forceTame = true; }, setWeather: (w) => setWeather(w, true), setNight: (v) => { G.night = !!v; updateWeatherChip(); },
   spawn: (t, d, pi) => spawnEnemy(t, d, pi), damage: (e, a) => damage(e, a), selectLevel, layoutWorld, CHAPTERS, OLD_LEVEL_MAP, heroUlt: (x, y) => heroUlt(x, y), tstat: (t) => tstat(t),
