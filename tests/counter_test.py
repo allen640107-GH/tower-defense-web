@@ -35,7 +35,7 @@ async def page(b, url, mode, vp=(390, 844)):
     else: ctx.on("request", lambda q: reqs.append(q.url) if "abacus" in q.url else None)
     await pg.goto(url); return ctx, pg, errs, reqs
 async def play_level(pg):
-    await pg.wait_for_selector("#introStart", state="visible", timeout=30000)
+    await pg.wait_for_selector("#iSkip", state="visible", timeout=30000)  # v2.2.1：自動播片頭
     await pg.evaluate("__td.finishIntro()"); await pg.wait_for_timeout(500)
     await pg.evaluate("__td.startLevel(1)"); await pg.wait_for_timeout(600)
     await pg.evaluate("__td.setDebugSpeed(4)")

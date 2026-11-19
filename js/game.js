@@ -744,7 +744,7 @@ function showScreen(s) {
   if (!play) { $("banner").classList.add("hidden"); $("evoSheet").classList.add("hidden"); clearToasts(); }
   const tv = $("titleV");
   if (s === "menu" || s === "select" || s === "codex" || s === "ach" || s === "settings" || s === "help" || s === "credits" || s === "talents") {
-    if (s === "menu") playTitleLoop(); if (G.screen !== "play") AUDIO.music("menu");
+    if (s === "menu") { playTitleLoop(); const q = $("mQuick"); if (q) q.textContent = "立刻開始 " + LEVELS[quickLevel()].code; } if (G.screen !== "play") AUDIO.music("menu");
   } else if (tv && !tv.paused) tv.pause();
 }
 function playTitleLoop() {
@@ -1237,7 +1237,7 @@ function endDrag() {
 window.addEventListener("pointerup", endDrag); window.addEventListener("pointercancel", endDrag);
 cv.addEventListener("pointerleave", () => { G.hover = null; });
 window.addEventListener("keydown", (ev) => {
-  if (G.screen === "intro" && !$("iSkip").classList.contains("hidden") && (ev.key === "Escape" || ev.key === " " || ev.key === "Enter")) { finishIntro(); return; }
+  if (G.screen === "intro" && (ev.key === "Escape" || ev.key === "Enter")) { finishIntro(); return; }
   if (G.screen !== "play") return;
   if (ev.key === "Escape") { if (G.build || G.aim || G.sel) { G.build = null; G.aim = null; G.sel = null; refreshSel(); updatePanel(); } else setPaused(!G.paused); }
   if (ev.key === " ") { ev.preventDefault(); startWave(); }
@@ -1265,7 +1265,10 @@ $("mAch").onclick = () => { AUDIO.play("click"); buildAch(); showScreen("ach"); 
 $("mSet").onclick = () => { AUDIO.play("click"); syncSettings(); showScreen("settings"); };
 $("mHelp").onclick = () => { AUDIO.play("click"); showScreen("help"); };
 $("mCredits").onclick = () => { AUDIO.play("click"); buildCredits(); showScreen("credits"); };
-$("mIntro").onclick = () => { AUDIO.play("click"); playIntro(); };
+$("mIntro").onclick = () => { AUDIO.play("click"); playIntro(true); };
+// 選單「立刻開始」：直接進入目前進度的關卡（新玩家＝1-1）
+function quickLevel() { for (let i = 0; i < save.unlocked && i < LEVELS.length; i++) if (!(save.stars[i] | 0)) return i; return Math.min(LEVELS.length - 1, save.unlocked - 1); }
+$("mQuick").onclick = () => { AUDIO.play("click"); startLevel(quickLevel()); };
 $("mReset").onclick = () => {
   if (!confirm("確定要重置恐龍防線的進度、圖鑑與成就嗎？（舊版守護之塔存檔不受影響）")) return;
   const keep = { muted: save.muted, music: save.music, sfx: save.sfx, introSeen: save.introSeen };
@@ -1280,42 +1283,52 @@ $("sMute").onclick = () => { save.muted = !save.muted; writeSave(); syncSettings
 // ---------------- 片頭 ----------------
 const iv = $("introV");
 let introTitleTimer = 0;
-function showIntroStart() {
-  showScreen("intro"); $("introStart").classList.remove("hidden"); $("iSkip").classList.add("hidden"); $("introTitle").classList.add("hidden");
-  $("iEnter").classList.toggle("hidden", !save.introSeen);
-  $("iQuick").classList.toggle("hidden", !!save.introSeen);
+// v2.2.1：進遊戲直接自動播放片頭。瀏覽器禁止「有聲音的自動播放」，所以先靜音播放（muted + playsinline），
+// 第一次點畫面（跳過鍵以外）就開聲音；如果連靜音自動播放都失敗（例如 iOS 低耗電模式），顯示中央大播放鍵，點一下有聲播放。
+// 右上角「跳過動畫」從第一次就一直在；跳過或播完進主選單。
+let introSound = false;
+function introUnmute() {
+  if (save.muted) { $("iSound").classList.add("hidden"); return; }
+  iv.muted = false; iv.volume = Math.max(0.3, save.music); introSound = true;
+  const p = iv.paused ? iv.play() : null; if (p && p.catch) p.catch(() => {});
+  $("iSound").classList.add("hidden");
 }
-function playIntro() {
-  AUDIO.unlock(); AUDIO.stopMusic();
-  showScreen("intro"); $("introStart").classList.add("hidden"); $("iSkip").classList.remove("hidden"); $("introTitle").classList.add("hidden"); G._introT = performance.now();
+function playIntro(fromGesture) {
+  AUDIO.stopMusic();
+  showScreen("intro"); $("iSkip").classList.remove("hidden"); $("introTitle").classList.add("hidden"); $("iBigPlay").classList.add("hidden");
+  G._introT = performance.now();
   try { iv.currentTime = 0; } catch (e) { /* */ }
-  iv.muted = !!save.muted; iv.volume = save.muted ? 0 : Math.max(0.3, save.music);
+  introSound = false;
+  if (fromGesture && !save.muted) { AUDIO.unlock(); iv.muted = false; iv.volume = Math.max(0.3, save.music); introSound = true; }
+  else iv.muted = true;
+  $("iSound").classList.toggle("hidden", introSound || !!save.muted);
   const p = iv.play();
-  if (p && p.catch) p.catch(() => { iv.muted = true; const q = iv.play(); if (q && q.catch) q.catch(() => finishIntro()); });
+  if (p && p.catch) p.catch(() => {
+    if (!iv.muted) { iv.muted = true; introSound = false; const q = iv.play(); if (q && q.catch) q.catch(() => showBigPlay()); $("iSound").classList.toggle("hidden", !!save.muted); }
+    else showBigPlay();
+  });
   clearInterval(introTitleTimer);
   introTitleTimer = setInterval(() => { if (iv.currentTime >= 18.4) { $("introTitle").classList.remove("hidden"); clearInterval(introTitleTimer); } }, 200);
 }
+function showBigPlay() { if (G.screen !== "intro") return; $("iBigPlay").classList.remove("hidden"); $("iSound").classList.add("hidden"); }
 function finishIntro() {
   if (G.screen !== "intro") return;
   clearInterval(introTitleTimer); iv.pause();
+  $("iBigPlay").classList.add("hidden"); $("iSound").classList.add("hidden"); $("iSkip").classList.add("hidden");
   save.introSeen = true; writeSave();
   showScreen("menu");
 }
 iv.addEventListener("ended", finishIntro);
-iv.addEventListener("error", () => { if (G.screen === "intro" && $("introStart").classList.contains("hidden")) finishIntro(); });
-iv.addEventListener("click", () => { if (!$("iSkip").classList.contains("hidden")) finishIntro(); });
-$("iSkip").onclick = (e) => { e.stopPropagation(); AUDIO.play("click"); finishIntro(); };
-$("iPlay").onclick = () => playIntro();
-// v2.2：第一次開啟就能直接開打 1-1（片頭之後可在選單「重看片頭」）
-$("iQuick").onclick = () => { AUDIO.unlock(); AUDIO.play("click"); save.introSeen = true; writeSave(); clearInterval(introTitleTimer); try { iv.pause(); } catch (e) { /* */ } startLevel(0); };
-// 片頭播放中點畫面任何地方＝跳過
-$("intro").addEventListener("pointerdown", (e) => {
-  if ($("iSkip").classList.contains("hidden") || G.screen !== "intro" || performance.now() - (G._introT || 0) < 450) return;
-  if (e.target && e.target.id === "iSkip") return;
-  e.preventDefault(); AUDIO.play("click"); finishIntro();
+iv.addEventListener("error", () => { if (G.screen === "intro") finishIntro(); });
+$("iSkip").onclick = (e) => { e.stopPropagation(); AUDIO.unlock(); AUDIO.play("click"); finishIntro(); };
+$("iBigPlay").onclick = (e) => { e.stopPropagation(); AUDIO.unlock(); $("iBigPlay").classList.add("hidden"); introUnmute(); const p = iv.play(); if (p && p.catch) p.catch(() => { iv.muted = true; const q = iv.play(); if (q && q.catch) q.catch(() => finishIntro()); }); };
+// 片頭播放中點畫面（跳過鍵、大播放鍵以外）＝開聲音（不跳過）
+for (const ev of ["pointerup", "click"]) $("intro").addEventListener(ev, (e) => {
+  if (G.screen !== "intro" || introSound) return;
+  if (e.target && (e.target.closest("#iSkip") || e.target.closest("#iBigPlay"))) return;
+  if (!$("iBigPlay").classList.contains("hidden")) return;
+  AUDIO.unlock(); introUnmute();
 });
-$("iEnter").onclick = () => { AUDIO.unlock(); save.introSeen = true; writeSave(); G.screen = "intro"; finishIntro(); };
-
 // ---------------- 載入 ----------------
 function loadAll() {
   const fontP = document.fonts && document.fonts.load ? document.fonts.load('900 40px "DinoTitle"', "恐龍防線").catch(() => {}) : Promise.resolve();
@@ -1362,5 +1375,5 @@ loadSave(); layout(); syncSettings(); showScreen("loading");
 requestAnimationFrame(frame);
 loadAll().then(() => {
   $("ltext").textContent = "載入完成";
-  setTimeout(() => { if (save.introSeen) { showScreen("menu"); } else showIntroStart(); }, 250);
+  setTimeout(() => playIntro(false), 250);
 });

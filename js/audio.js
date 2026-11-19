@@ -40,15 +40,37 @@ const AUDIO = (() => {
       } catch (e) { /* 舊瀏覽器 */ }
     }
   }
+  // v2.2.1 修正「重開遊戲有時沒有背景音樂」：
+  // 舊版在第一次 pointerdown 就把 unlocked 設成 true，但手機觸控的 pointerdown 不算「使用者啟用」手勢，
+  // 這時 AudioContext.resume() 與 <audio>.play() 會被瀏覽器拒絕；之後因為 unlocked 已是 true、curTrack 也已設好，
+  // 不會再重試，音樂就一直靜音。現在每次手勢（pointerdown／pointerup／touchend／click／keydown）都檢查，
+  // 直到 AudioContext 真的是 running 且音樂真的在播放為止；切回分頁或從 bfcache 還原時也會恢復。
+  let hold = false, hidden = false, lastTry = 0;
+  function musicOk() { return !wantTrack || hold || (musicEl && curTrack === wantTrack && (!musicEl.paused || musicEl.ended)); }
+  function healthy() { return ctx && ctx.state === "running" && musicOk(); }
   function unlock() {
     ensureCtx(); if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
-    if (!unlocked) {
-      unlocked = true;
-      try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { /* */ }
-      decodeAll();
-      if (wantTrack) music(wantTrack, true);
-    }
+    if (ctx.state !== "running") { try { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* */ } }
+    try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) { /* */ }
+    if (!unlocked) { unlocked = true; decodeAll(); }
+    if (!hidden && !musicOk()) music(wantTrack, true);
+  }
+  // 手勢處理：已經正常時不做事（很便宜）
+  function gesture() { if (hidden) return; if (!unlocked || !healthy()) unlock(); }
+  function onHide() { hidden = true; if (musicEl && !musicEl.paused) musicEl.pause(); }
+  function onShow() {
+    hidden = false; if (!ctx) return;
+    if (ctx.state !== "running") { try { const p = ctx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* */ } }
+    if (unlocked && !musicOk() && wantTrack) { const p = musicEl && curTrack === wantTrack ? musicEl.play() : (music(wantTrack, true), null); if (p && p.catch) p.catch(() => {}); }
+  }
+  if (typeof document !== "undefined") {
+    for (const ev of ["pointerdown", "pointerup", "touchend", "click", "keydown"]) document.addEventListener(ev, gesture, { capture: true, passive: true });
+    document.addEventListener("visibilitychange", () => { if (document.hidden) onHide(); else onShow(); });
+    window.addEventListener("pagehide", onHide);
+    window.addEventListener("pageshow", (e) => { if (e.persisted || hidden) onShow(); });
+    window.addEventListener("focus", () => { if (!document.hidden) onShow(); });
+    // 保險：每 2 秒檢查一次，音樂該播卻停了（例如被系統中斷），而 AudioContext 已可用時自動補播
+    setInterval(() => { if (!hidden && unlocked && ctx && ctx.state === "running" && !musicOk() && performance.now() - lastTry > 1800) { lastTry = performance.now(); onShow(); } }, 2000);
   }
   function play(n, opt) {
     if (!ctx || !unlocked || muted) return;
@@ -77,9 +99,9 @@ const AUDIO = (() => {
   }
   const TRACKS = { menu: "menu", level1: "level1", level2: "level2", boss: "boss", win: "win", lose: "lose" };
   function music(name, force) {
-    wantTrack = name;
-    if (!unlocked) return;
-    if (!force && curTrack === name) return;
+    wantTrack = name; hold = false;
+    if (!unlocked || hidden) return;
+    if (!force && curTrack === name && musicEl && !musicEl.paused) return;
     curTrack = name;
     if (!musicEl) {
       musicEl = new Audio(); musicEl.preload = "auto"; musicEl.crossOrigin = "anonymous";
@@ -92,14 +114,17 @@ const AUDIO = (() => {
     if (!musicSrc) musicEl.volume = muted ? 0 : vMusic;
     // 淡入
     if (musicGain) { const t = ctx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(0.0001, t); musicGain.gain.linearRampToValueAtTime(vMusic * 0.8, t + 1.2); }
-    const p = musicEl.play(); if (p && p.catch) p.catch(() => {});
+    lastTry = performance.now();
+    const p = musicEl.play(); if (p && p.catch) p.catch(() => { /* 被拒絕：下一次手勢會再試（gesture → unlock） */ });
   }
   function stopMusic() { wantTrack = null; curTrack = null; if (musicEl) musicEl.pause(); }
-  function pauseMusic(b) { if (!musicEl || !curTrack) return; if (b) musicEl.pause(); else { const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); } }
+  function pauseMusic(b) { hold = !!b; if (!musicEl || !curTrack) return; if (b) musicEl.pause(); else if (!hidden) { const p = musicEl.play(); if (p && p.catch) p.catch(() => {}); } }
+  // 測試用：音樂實際狀態
+  function state() { return { ctx: ctx ? ctx.state : "none", unlocked, want: wantTrack, track: curTrack, paused: musicEl ? musicEl.paused : true, t: musicEl ? musicEl.currentTime : 0, hidden, hold }; }
   function set(o) {
     if ("muted" in o) muted = !!o.muted; if ("music" in o) vMusic = o.music; if ("sfx" in o) vSfx = o.sfx;
     applyVol(); if (musicEl && !musicSrc) musicEl.volume = muted ? 0 : vMusic;
   }
-  return { preload, unlock, play, ambient, music, stopMusic, pauseMusic, set, get unlocked() { return unlocked; }, count: SFX_NAMES.length,
+  return { preload, unlock, play, state, onHide, onShow, ambient, music, stopMusic, pauseMusic, set, get unlocked() { return unlocked; }, count: SFX_NAMES.length,
     get ready() { return Object.keys(buffers).length; } };
 })();

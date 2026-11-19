@@ -340,3 +340,14 @@ body.portrait #info .act{min-height:44px}
 @media (max-width:400px){.evoCard td{white-space:normal;letter-spacing:0}.evoCard td em{white-space:nowrap}}
 #selTop .hlv.pts::after{display:none}
 #selTop .hlv.pts{border-color:#ffd25e;background:#5a3a08}
+/* v2.2.1 片頭：自動播放、跳過動畫、開聲音提示、大播放鍵；選單「立刻開始」 */
+#iSkip.skip{font-size:clamp(22px,5.6vmin,30px);font-weight:900;min-height:60px;padding:12px 24px;color:#fff;background:rgba(0,0,0,.78);border:3px solid #ffd25e;box-shadow:0 4px 14px rgba(0,0,0,.7);text-shadow:0 2px 0 #000;z-index:5}
+.iSound{position:absolute;left:50%;transform:translateX(-50%);bottom:max(22px,calc(env(safe-area-inset-bottom) + 14px));z-index:4;display:flex;align-items:center;gap:10px;
+  background:rgba(0,0,0,.78);border:3px solid #ffd25e;border-radius:30px;padding:8px 20px 8px 10px;font-size:clamp(20px,5vmin,26px);font-weight:900;color:#fff;text-shadow:0 2px 0 #000;pointer-events:none;white-space:nowrap;animation:pulse 1.4s infinite}
+.iSound img{width:40px;height:40px}
+.bigPlay{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:4;width:min(240px,56vmin);height:min(240px,56vmin);border-radius:50%;background:rgba(0,0,0,.72);border:5px solid #ffd25e;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#fff;box-shadow:0 0 30px rgba(0,0,0,.8)}
+.bigPlay .tri{width:0;height:0;border-left:min(74px,17vmin) solid #ffd25e;border-top:min(44px,10vmin) solid transparent;border-bottom:min(44px,10vmin) solid transparent;margin-left:14px}
+.bigPlay b{font-size:clamp(20px,5vmin,26px);font-weight:900;text-shadow:0 2px 0 #000}
+#mQuick{grid-column:1/-1;font-size:clamp(24px,5.6vmin,32px);min-height:60px;animation:pulse 1.2s infinite}
+@media (max-height:520px){.mbtns #mStart{grid-column:1/3}#mQuick{grid-column:3/5;min-height:52px;font-size:22px}}

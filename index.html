@@ -29,14 +29,10 @@
     <source src="video/intro.mp4" type="video/mp4">
   </video>
   <div id="introTitle" class="introTitle hidden"><div class="l1">恐龍防線</div><div class="l2">DINO DEFENSE</div></div>
-  <div id="introStart" class="introStart">
-    <div class="logo"><div class="l1">恐龍防線</div><div class="l2">DINO DEFENSE</div></div>
-    <button id="iQuick" class="big quick">立刻開始 1-1</button>
-    <button id="iPlay" class="big alt">觀看片頭（24 秒）</button>
-    <button id="iEnter" class="big alt hidden">直接進入遊戲</button>
-    <div class="ihint">片頭只會自動播一次，點畫面任何地方就能跳過・建議開啟聲音</div>
-  </div>
-  <button id="iSkip" class="skip hidden">跳過 ▶▶</button>
+  <!-- v2.2.1：進遊戲直接自動播片頭（先靜音自動播放，點一下畫面就開聲音）；右上角一直有「跳過動畫」 -->
+  <button id="iBigPlay" class="bigPlay hidden" aria-label="播放片頭（有聲音）"><span class="tri"></span><b>點一下播放</b></button>
+  <div id="iSound" class="iSound hidden"><img src="img/i_sound.webp" alt=""><span>點一下開啟聲音</span></div>
+  <button id="iSkip" class="skip hidden">跳過動畫 ▶▶</button>
 </div>
 
 <!-- HUD -->
@@ -89,6 +85,7 @@
   <div class="logo big"><div class="l1">恐龍防線</div><div class="l2">DINO DEFENSE</div></div>
   <div class="mbtns">
     <button id="mStart" class="big">開始遊戲</button>
+    <button id="mQuick" class="big quick">立刻開始 1-1</button>
     <button id="mCodex" class="big alt">恐龍圖鑑</button>
     <button id="mAch" class="big alt">化石與成就</button>
     <button id="mSet" class="big alt">設定</button>
@@ -97,7 +94,7 @@
     <button id="mCredits" class="big alt">製作名單</button>
     <button id="mReset" class="big alt">重置存檔</button>
   </div>
-  <div class="ver">v2.2 恐龍防線</div>
+  <div class="ver">v2.2.1 恐龍防線</div>
 </div>
 
 <!-- 關卡選擇 -->
